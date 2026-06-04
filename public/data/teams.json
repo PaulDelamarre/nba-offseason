@@ -1,0 +1,362 @@
+[
+  {
+    "abbr": "ATL",
+    "name": "Atlanta Hawks",
+    "conf": "East",
+    "colors": [
+      "#e03a3e",
+      "#26282a"
+    ],
+    "rosterCount": 20,
+    "committed2026": 153088971,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "BOS",
+    "name": "Boston Celtics",
+    "conf": "East",
+    "colors": [
+      "#007a33",
+      "#ba9653"
+    ],
+    "rosterCount": 15,
+    "committed2026": 180193378,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "BRK",
+    "name": "Brooklyn Nets",
+    "conf": "East",
+    "colors": [
+      "#000000",
+      "#ffffff"
+    ],
+    "rosterCount": 22,
+    "committed2026": 120698770,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "CHO",
+    "name": "Charlotte Hornets",
+    "conf": "East",
+    "colors": [
+      "#1d1160",
+      "#00788c"
+    ],
+    "rosterCount": 19,
+    "committed2026": 148402018,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "CHI",
+    "name": "Chicago Bulls",
+    "conf": "East",
+    "colors": [
+      "#ce1141",
+      "#000000"
+    ],
+    "rosterCount": 19,
+    "committed2026": 92955470,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "CLE",
+    "name": "Cleveland Cavaliers",
+    "conf": "East",
+    "colors": [
+      "#860038",
+      "#fdbb30"
+    ],
+    "rosterCount": 22,
+    "committed2026": 222210758,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "DAL",
+    "name": "Dallas Mavericks",
+    "conf": "West",
+    "colors": [
+      "#00538c",
+      "#002b5e"
+    ],
+    "rosterCount": 20,
+    "committed2026": 148946592,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "DEN",
+    "name": "Denver Nuggets",
+    "conf": "West",
+    "colors": [
+      "#0e2240",
+      "#fec524"
+    ],
+    "rosterCount": 19,
+    "committed2026": 215482928,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "DET",
+    "name": "Detroit Pistons",
+    "conf": "East",
+    "colors": [
+      "#c8102e",
+      "#1d42ba"
+    ],
+    "rosterCount": 19,
+    "committed2026": 133047899,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "GSW",
+    "name": "Golden State Warriors",
+    "conf": "West",
+    "colors": [
+      "#1d428a",
+      "#ffc72c"
+    ],
+    "rosterCount": 20,
+    "committed2026": 181479537,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "HOU",
+    "name": "Houston Rockets",
+    "conf": "West",
+    "colors": [
+      "#ce1141",
+      "#c4ced4"
+    ],
+    "rosterCount": 18,
+    "committed2026": 184925541,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "IND",
+    "name": "Indiana Pacers",
+    "conf": "East",
+    "colors": [
+      "#002d62",
+      "#fdbb30"
+    ],
+    "rosterCount": 23,
+    "committed2026": 202960296,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "LAC",
+    "name": "Los Angeles Clippers",
+    "conf": "West",
+    "colors": [
+      "#c8102e",
+      "#1d428a"
+    ],
+    "rosterCount": 20,
+    "committed2026": 156542640,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "LAL",
+    "name": "Los Angeles Lakers",
+    "conf": "West",
+    "colors": [
+      "#552583",
+      "#fdb927"
+    ],
+    "rosterCount": 15,
+    "committed2026": 91775625,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "MEM",
+    "name": "Memphis Grizzlies",
+    "conf": "West",
+    "colors": [
+      "#5d76a9",
+      "#12173f"
+    ],
+    "rosterCount": 28,
+    "committed2026": 136884441,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "MIA",
+    "name": "Miami Heat",
+    "conf": "East",
+    "colors": [
+      "#98002e",
+      "#f9a01b"
+    ],
+    "rosterCount": 18,
+    "committed2026": 163037112,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "MIL",
+    "name": "Milwaukee Bucks",
+    "conf": "East",
+    "colors": [
+      "#00471b",
+      "#eee1c6"
+    ],
+    "rosterCount": 22,
+    "committed2026": 156730540,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "MIN",
+    "name": "Minnesota Timberwolves",
+    "conf": "West",
+    "colors": [
+      "#0c2340",
+      "#236192"
+    ],
+    "rosterCount": 20,
+    "committed2026": 190387866,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "NOP",
+    "name": "New Orleans Pelicans",
+    "conf": "West",
+    "colors": [
+      "#0c2340",
+      "#c8102e"
+    ],
+    "rosterCount": 19,
+    "committed2026": 196214389,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "NYK",
+    "name": "New York Knicks",
+    "conf": "East",
+    "colors": [
+      "#006bb6",
+      "#f58426"
+    ],
+    "rosterCount": 16,
+    "committed2026": 205460628,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "OKC",
+    "name": "Oklahoma City Thunder",
+    "conf": "West",
+    "colors": [
+      "#007ac1",
+      "#ef3b24"
+    ],
+    "rosterCount": 19,
+    "committed2026": 250574372,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "ORL",
+    "name": "Orlando Magic",
+    "conf": "East",
+    "colors": [
+      "#0077c0",
+      "#c4ced4"
+    ],
+    "rosterCount": 18,
+    "committed2026": 222030208,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "PHI",
+    "name": "Philadelphia 76ers",
+    "conf": "East",
+    "colors": [
+      "#006bb6",
+      "#ed174c"
+    ],
+    "rosterCount": 20,
+    "committed2026": 180319943,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "PHO",
+    "name": "Phoenix Suns",
+    "conf": "West",
+    "colors": [
+      "#1d1160",
+      "#e56020"
+    ],
+    "rosterCount": 22,
+    "committed2026": 182085938,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "POR",
+    "name": "Portland Trail Blazers",
+    "conf": "West",
+    "colors": [
+      "#e03a3e",
+      "#000000"
+    ],
+    "rosterCount": 21,
+    "committed2026": 170198098,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "SAC",
+    "name": "Sacramento Kings",
+    "conf": "West",
+    "colors": [
+      "#5a2d81",
+      "#63727a"
+    ],
+    "rosterCount": 19,
+    "committed2026": 199990462,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "SAS",
+    "name": "San Antonio Spurs",
+    "conf": "West",
+    "colors": [
+      "#c4ced4",
+      "#000000"
+    ],
+    "rosterCount": 20,
+    "committed2026": 152768566,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "TOR",
+    "name": "Toronto Raptors",
+    "conf": "East",
+    "colors": [
+      "#ce1141",
+      "#000000"
+    ],
+    "rosterCount": 20,
+    "committed2026": 193059996,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "UTA",
+    "name": "Utah Jazz",
+    "conf": "West",
+    "colors": [
+      "#002b5c",
+      "#00471b"
+    ],
+    "rosterCount": 25,
+    "committed2026": 137856956,
+    "targetSeason": "2026-27"
+  },
+  {
+    "abbr": "WAS",
+    "name": "Washington Wizards",
+    "conf": "East",
+    "colors": [
+      "#002b5c",
+      "#e31837"
+    ],
+    "rosterCount": 26,
+    "committed2026": 169476622,
+    "targetSeason": "2026-27"
+  }
+]

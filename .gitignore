@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+
+# Cache de scraping (HTML brut BBRef) — volumineux, régénérable
+scripts/.cache/

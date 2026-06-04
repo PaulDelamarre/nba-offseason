@@ -1,0 +1,101 @@
+// Données draft 2026 (projection / recherchées).
+//
+// ROOKIE_SCALE_2026 : salaire année 1 (à 120 %, ce que touchent réellement la
+// plupart des 1ers tours) pour les choix 1 → 30, saison 2026-27. Base = barème
+// officiel 2025-26 (Hoops Rumors) projeté +5 % (le barème grandit avec le cap).
+// Index 1..30.
+export const ROOKIE_SCALE_2026 = {
+  1: 14_517_000, 2: 12_989_000, 3: 11_664_000, 4: 10_516_000, 5: 9_523_000,
+  6: 8_650_000, 7: 7_896_000, 8: 7_234_000, 9: 6_649_000, 10: 6_317_000,
+  11: 6_001_000, 12: 5_701_000, 13: 5_416_000, 14: 5_145_000, 15: 4_888_000,
+  16: 4_643_000, 17: 4_411_000, 18: 4_191_000, 19: 4_002_000, 20: 3_842_000,
+  21: 3_688_000, 22: 3_541_000, 23: 3_399_000, 24: 3_264_000, 25: 3_132_000,
+  26: 3_029_000, 27: 2_941_000, 28: 2_923_000, 29: 2_902_000, 30: 2_881_000,
+};
+
+// Ordre de draft réel 2026 (mock ESPN post-combine, loterie de mai 2026
+// intégrée, picks échangés inclus) : quelle franchise pioche à chaque slot.
+// `team` = abréviation de l'équipe qui détient le choix.
+export const DRAFT_ORDER_2026 = [
+  { pick: 1, team: 'WAS' }, { pick: 2, team: 'UTA' }, { pick: 3, team: 'MEM' }, { pick: 4, team: 'CHI' },
+  { pick: 5, team: 'LAC' }, { pick: 6, team: 'BRK' }, { pick: 7, team: 'SAC' }, { pick: 8, team: 'ATL' },
+  { pick: 9, team: 'DAL' }, { pick: 10, team: 'MIL' }, { pick: 11, team: 'GSW' }, { pick: 12, team: 'OKC' },
+  { pick: 13, team: 'MIA' }, { pick: 14, team: 'CHO' }, { pick: 15, team: 'CHI' }, { pick: 16, team: 'MEM' },
+  { pick: 17, team: 'OKC' }, { pick: 18, team: 'CHO' }, { pick: 19, team: 'TOR' }, { pick: 20, team: 'SAS' },
+  { pick: 21, team: 'DET' }, { pick: 22, team: 'PHI' }, { pick: 23, team: 'ATL' }, { pick: 24, team: 'NYK' },
+  { pick: 25, team: 'LAL' }, { pick: 26, team: 'DEN' }, { pick: 27, team: 'BOS' }, { pick: 28, team: 'MIN' },
+  { pick: 29, team: 'CLE' }, { pick: 30, team: 'DAL' },
+  { pick: 31, team: 'NYK' }, { pick: 32, team: 'MEM' }, { pick: 33, team: 'BRK' }, { pick: 34, team: 'SAC' },
+  { pick: 35, team: 'SAS' }, { pick: 36, team: 'LAC' }, { pick: 37, team: 'OKC' }, { pick: 38, team: 'CHI' },
+  { pick: 39, team: 'HOU' }, { pick: 40, team: 'BOS' }, { pick: 41, team: 'MIA' }, { pick: 42, team: 'SAS' },
+  { pick: 43, team: 'BRK' }, { pick: 44, team: 'SAS' }, { pick: 45, team: 'SAC' }, { pick: 46, team: 'ORL' },
+  { pick: 47, team: 'PHO' }, { pick: 48, team: 'DAL' }, { pick: 49, team: 'DEN' }, { pick: 50, team: 'TOR' },
+  { pick: 51, team: 'WAS' }, { pick: 52, team: 'LAC' }, { pick: 53, team: 'HOU' }, { pick: 54, team: 'GSW' },
+  { pick: 55, team: 'NYK' }, { pick: 56, team: 'CHI' }, { pick: 57, team: 'ATL' }, { pick: 58, team: 'NOP' },
+  { pick: 59, team: 'MIN' }, { pick: 60, team: 'WAS' },
+];
+
+// Classe de prospects 2026 (mock draft ESPN post-combine, 2 tours = 60 choix).
+// { rank, name, pos, team } — `rank` = slot projeté (sert au salaire rookie scale).
+export const PROSPECTS_2026 = [
+  { rank: 1, name: 'AJ Dybantsa', pos: 'SF', team: 'BYU' },
+  { rank: 2, name: 'Darryn Peterson', pos: 'SG', team: 'Kansas' },
+  { rank: 3, name: 'Cameron Boozer', pos: 'PF', team: 'Duke' },
+  { rank: 4, name: 'Caleb Wilson', pos: 'PF', team: 'North Carolina' },
+  { rank: 5, name: 'Keaton Wagler', pos: 'SG', team: 'Illinois' },
+  { rank: 6, name: 'Darius Acuff Jr.', pos: 'PG', team: 'Arkansas' },
+  { rank: 7, name: 'Kingston Flemings', pos: 'PG', team: 'Houston' },
+  { rank: 8, name: 'Aday Mara', pos: 'C', team: 'Michigan' },
+  { rank: 9, name: 'Mikel Brown Jr.', pos: 'PG', team: 'Louisville' },
+  { rank: 10, name: 'Nate Ament', pos: 'SF', team: 'Tennessee' },
+  { rank: 11, name: 'Brayden Burries', pos: 'SG', team: 'Arizona' },
+  { rank: 12, name: 'Yaxel Lendeborg', pos: 'PF', team: 'Michigan' },
+  { rank: 13, name: 'Labaron Philon Jr.', pos: 'PG', team: 'Alabama' },
+  { rank: 14, name: 'Karim Lopez', pos: 'SF', team: 'NZ Breakers' },
+  { rank: 15, name: 'Cameron Carr', pos: 'SG', team: 'Baylor' },
+  { rank: 16, name: 'Christian Anderson', pos: 'PG', team: 'Texas Tech' },
+  { rank: 17, name: 'Morez Johnson Jr.', pos: 'PF', team: 'Michigan' },
+  { rank: 18, name: 'Hannes Steinbach', pos: 'PF', team: 'Washington' },
+  { rank: 19, name: 'Bennett Stirtz', pos: 'PG', team: 'Iowa' },
+  { rank: 20, name: 'Jayden Quaintance', pos: 'C', team: 'Kentucky' },
+  { rank: 21, name: 'Isaiah Evans', pos: 'SG', team: 'Duke' },
+  { rank: 22, name: 'Allen Graves', pos: 'PF', team: 'Santa Clara' },
+  { rank: 23, name: 'Ebuka Okorie', pos: 'PG', team: 'Stanford' },
+  { rank: 24, name: 'Chris Cenac Jr.', pos: 'C', team: 'Houston' },
+  { rank: 25, name: 'Henri Veesaar', pos: 'C', team: 'North Carolina' },
+  { rank: 26, name: 'Dailyn Swain', pos: 'SF', team: 'Texas' },
+  { rank: 27, name: 'Koa Peat', pos: 'PF', team: 'Arizona' },
+  { rank: 28, name: 'Meleek Thomas', pos: 'SG', team: 'Arkansas' },
+  { rank: 29, name: 'Zuby Ejiofor', pos: 'C', team: "St. John's" },
+  { rank: 30, name: 'Joshua Jefferson', pos: 'SF', team: 'Iowa State' },
+  { rank: 31, name: 'Alex Karaban', pos: 'SF', team: 'UConn' },
+  { rank: 32, name: 'Amari Allen', pos: 'SF', team: 'Alabama' },
+  { rank: 33, name: 'Matt Able', pos: 'SF', team: 'NC State' },
+  { rank: 34, name: 'Tounde Yessoufou', pos: 'SF', team: 'Baylor' },
+  { rank: 35, name: 'Tyler Tanner', pos: 'PG', team: 'Vanderbilt' },
+  { rank: 36, name: 'Malachi Moreno', pos: 'C', team: 'Kentucky' },
+  { rank: 37, name: 'Tarris Reed Jr.', pos: 'C', team: 'UConn' },
+  { rank: 38, name: 'Milan Momcilovic', pos: 'PF', team: 'Iowa State' },
+  { rank: 39, name: 'Luigi Suigo', pos: 'C', team: 'Mega Basket' },
+  { rank: 40, name: 'Jack Kayil', pos: 'PG', team: 'Alba Berlin' },
+  { rank: 41, name: 'Baba Miller', pos: 'PF', team: 'Cincinnati' },
+  { rank: 42, name: 'Flory Bidunga', pos: 'C', team: 'Kansas' },
+  { rank: 43, name: 'Sergio de Larrea', pos: 'PG', team: 'Valencia' },
+  { rank: 44, name: 'Ryan Conwell', pos: 'SG', team: 'Louisville' },
+  { rank: 45, name: 'Trevon Brazile', pos: 'PF', team: 'Arkansas' },
+  { rank: 46, name: 'Braden Smith', pos: 'PG', team: 'Purdue' },
+  { rank: 47, name: 'Jeremy Fears Jr.', pos: 'PG', team: 'Michigan State' },
+  { rank: 48, name: 'Rueben Chinyelu', pos: 'C', team: 'Florida' },
+  { rank: 49, name: 'Felix Okpara', pos: 'C', team: 'Tennessee' },
+  { rank: 50, name: 'Andrej Stojakovic', pos: 'SG', team: 'Illinois' },
+  { rank: 51, name: 'Jaden Bradley', pos: 'PG', team: 'Arizona' },
+  { rank: 52, name: 'Richie Saunders', pos: 'SG', team: 'BYU' },
+  { rank: 53, name: 'Billy Richmond III', pos: 'SG', team: 'Arkansas' },
+  { rank: 54, name: "Ja'Kobi Gillespie", pos: 'PG', team: 'Tennessee' },
+  { rank: 55, name: 'Izaiyah Nelson', pos: 'PF', team: 'South Florida' },
+  { rank: 56, name: 'Emanuel Sharp', pos: 'SG', team: 'Houston' },
+  { rank: 57, name: 'Nick Martinelli', pos: 'SF', team: 'Northwestern' },
+  { rank: 58, name: 'Kylan Boswell', pos: 'PG', team: 'Illinois' },
+  { rank: 59, name: 'Bruce Thornton', pos: 'PG', team: 'Ohio State' },
+  { rank: 60, name: 'Ugonna Onyenso', pos: 'C', team: 'Virginia' },
+];

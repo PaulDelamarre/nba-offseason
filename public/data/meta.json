@@ -1,0 +1,12 @@
+{
+  "season": "2025-26",
+  "targetSeason": "2026-27",
+  "scrapedAt": "2026-06-04T18:26:10.272Z",
+  "counts": {
+    "total": 608,
+    "rostered": 604,
+    "freeAgents": 4,
+    "withStats": 582
+  },
+  "failedTeams": []
+}

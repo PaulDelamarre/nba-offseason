@@ -1,0 +1,27 @@
+:root {
+  --bg: #0e0f12;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: #eceef2;
+}
+
+a { color: inherit; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2e34; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3f47; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+button { font-family: inherit; }
+input, select { font-family: inherit; }
