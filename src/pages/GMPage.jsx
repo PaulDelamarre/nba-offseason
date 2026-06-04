@@ -9,8 +9,8 @@ import {
   canExtend, extensionSchedule, maxExtensionYears, teamGuaranteedByYear, lastGuaranteedSeason,
 } from '../utils/contracts.js';
 import { effectiveTeam } from '../utils/players.js';
-import { nextPick, teamAt, takenRanks, picksOfTeam, LAST_PICK } from '../utils/draft.js';
-import { PROSPECTS_2026 } from '../constants/draft.js';
+import { nextPick, teamAt, takenRanks, picksOfTeam, LAST_PICK, rookieSalary } from '../utils/draft.js';
+import { PROSPECTS_2026, PROSPECT_STATS } from '../constants/draft.js';
 import { capSummary } from '../utils/cap.js';
 import { useGM } from '../context/GMContext.jsx';
 import { TeamChip, TierBadge, ImpactBubble, PlayerAvatar } from '../components/ui.jsx';
@@ -584,6 +584,7 @@ function DraftTab({ gm, season, myTeam }) {
   const madePickNums = Object.keys(picks).map(Number);
   const lastPickNum = madePickNums.length ? Math.max(...madePickNums) : null;
   const prospectByRank = (r) => PROSPECTS_2026.find((p) => p.rank === r);
+  const [prospect, setProspect] = useState(null); // fiche prospect (modal)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -616,7 +617,7 @@ function DraftTab({ gm, season, myTeam }) {
             const mine = team === myTeam;
             const current = pk === np;
             return (
-              <div key={pk} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderBottom: `1px solid ${C.border}`, background: current ? 'rgba(239,125,58,0.12)' : mine ? 'rgba(239,125,58,0.05)' : 'transparent' }}>
+              <div key={pk} onClick={() => pr && setProspect(pr)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderBottom: `1px solid ${C.border}`, cursor: pr ? 'pointer' : 'default', background: current ? 'rgba(239,125,58,0.12)' : mine ? 'rgba(239,125,58,0.05)' : 'transparent' }}>
                 <span style={{ width: 26, color: C.muted, fontSize: 12, fontWeight: 700, textAlign: 'right' }}>{pk}</span>
                 <TeamChip abbr={team} size={22} />
                 {pr
@@ -630,21 +631,22 @@ function DraftTab({ gm, season, myTeam }) {
         {/* Disponibles + mes recrues */}
         <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 800 }}>
-            Disponibles ({available.length}) {isMyTurn && <span style={{ color: C.accent, fontWeight: 600 }}>— clique pour drafter au #{np}</span>}
+            Disponibles ({available.length}) <span style={{ color: C.muted, fontWeight: 600 }}>— clique pour voir la fiche{isMyTurn ? ' / drafter' : ''}</span>
           </div>
           <div style={{ flex: 1, overflow: 'auto' }}>
             {available.map((p) => (
               <div key={p.rank}
-                onClick={() => { if (isMyTurn) gm.draftSelect(np, p.rank); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderBottom: `1px solid ${C.border}`, cursor: isMyTurn ? 'pointer' : 'default' }}
-                onMouseEnter={(e) => { if (isMyTurn) e.currentTarget.style.background = C.surface2; }}
+                onClick={() => setProspect(p)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = C.surface2; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
                 <span style={{ width: 26, color: C.muted, fontSize: 12, fontWeight: 700 }}>{p.rank}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: C.muted }}>{p.pos} · {p.team}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>{p.pos} · {p.team}{p.ht ? ` · ${fmtHeight(p.ht)}` : ''}{p.age ? ` · ${p.age}a` : ''}</div>
                 </div>
-                {isMyTurn && <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>drafter →</span>}
+                {PROSPECT_STATS[p.name] && <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{PROSPECT_STATS[p.name].pts.toFixed(1)} · {PROSPECT_STATS[p.name].reb.toFixed(1)} · {PROSPECT_STATS[p.name].ast.toFixed(1)}</span>}
+                <span style={{ fontSize: 11, color: isMyTurn ? C.accent : C.muted, fontWeight: 700 }}>{isMyTurn ? 'draft ›' : 'fiche ›'}</span>
               </div>
             ))}
           </div>
@@ -670,6 +672,87 @@ function DraftTab({ gm, season, myTeam }) {
           </div>
         </div>
       </div>
+
+      {prospect && (
+        <ProspectModal
+          prospect={prospect}
+          pickSlot={isMyTurn ? np : null}
+          onDraft={() => { gm.draftSelect(np, prospect.rank); setProspect(null); }}
+          onClose={() => setProspect(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ----- Fiche prospect (avant de drafter) ----------------------------------- */
+const fmtHeight = (inches) => (inches ? `${Math.floor(inches / 12)}'${inches % 12}"` : '—');
+const ARCHETYPE = { PG: 'Meneur', SG: 'Arrière', SF: 'Ailier', PF: 'Ailier-fort', C: 'Pivot' };
+
+function ProspectModal({ prospect, pickSlot, onDraft, onClose }) {
+  if (!prospect) return null;
+  const r = prospect.rank;
+  const tier = r <= 5 ? 'Top 5' : r <= 14 ? 'Loterie' : r <= 30 ? '1er tour' : '2e tour';
+  const tierCol = r <= 5 ? C.red : r <= 14 ? C.accent : r <= 30 ? C.blue : C.muted;
+  const salary = rookieSalary(pickSlot || r, '2026-27');
+  const initials = prospect.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const st = PROSPECT_STATS[prospect.name];
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} className="tcard" style={{ '--card-accent': tierCol, '--card-glow': tierCol, width: 'min(420px, 96vw)', borderRadius: 16, padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 70, height: 70, borderRadius: 12, border: `2px solid ${C.border}`, background: C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 800, color: C.muted, fontFamily: "'Oswald', sans-serif", flexShrink: 0 }}>{initials}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: 22, textTransform: 'uppercase' }}>{prospect.name}</h2>
+            <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{prospect.pos} · {prospect.team}</div>
+          </div>
+          <button onClick={onClose} style={{ ...btn, padding: '4px 10px' }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <Info label="Taille" value={fmtHeight(prospect.ht)} />
+          <Info label="Poids" value={prospect.wt ? `${prospect.wt} lb` : '—'} />
+          <Info label="Âge" value={prospect.age ? `${prospect.age} ans` : '—'} />
+        </div>
+
+        {st && (
+          <>
+            <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, margin: '14px 0 6px', fontFamily: "'Oswald', sans-serif" }}>Stats 2025-26 ({prospect.team})</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Info label="PTS" value={st.pts.toFixed(1)} color={C.accent} />
+              <Info label="REB" value={st.reb.toFixed(1)} color={C.accent} />
+              <Info label="AST" value={st.ast.toFixed(1)} color={C.accent} />
+            </div>
+          </>
+        )}
+
+        <div style={{ marginTop: 10, fontSize: 13, color: C.text, lineHeight: 1.45, fontStyle: 'italic' }}>
+          « {prospect.note || `${ARCHETYPE[prospect.pos] || 'Joueur'}, profil ${tier.toLowerCase()}.`} »
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <Info label="Projeté" value={`#${r}`} />
+          <Info label="Tier" value={tier} color={tierCol} />
+          <Info label={pickSlot ? `Salaire au #${pickSlot}` : 'Rookie scale est.'} value={fmtUSD(salary)} color={C.blue} />
+        </div>
+
+        {pickSlot ? (
+          <button onClick={onDraft} style={{ marginTop: 18, width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: C.accent, color: C.ink, fontWeight: 800, fontSize: 15, fontFamily: "'Oswald', sans-serif", letterSpacing: 0.5, textTransform: 'uppercase', boxShadow: `0 0 18px -4px ${C.accent}` }}>
+            ✓ Drafter au #{pickSlot}
+          </button>
+        ) : (
+          <div style={{ marginTop: 16, fontSize: 12, color: C.muted, textAlign: 'center' }}>Ce n'est pas ton tour — « Simuler jusqu'à mon pick » pour drafter.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value, color }) {
+  return (
+    <div style={{ flex: 1, background: C.bg, border: `2px solid ${C.border}`, borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+      <div className="cond" style={{ fontSize: 15, fontWeight: 700, color: color || C.text }}>{value}</div>
+      <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
     </div>
   );
 }
@@ -800,7 +883,7 @@ function CapLine({ label, value, color, strong }) {
   );
 }
 function SectionTitle({ children, color }) {
-  return <div style={{ fontSize: 12, fontWeight: 800, color: color || C.text, marginBottom: 8, letterSpacing: 0.3 }}>{children}</div>;
+  return <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: color || C.text, marginBottom: 8, letterSpacing: 0.6, textTransform: 'uppercase' }}>{children}</div>;
 }
 
 const btn = { background: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 10px', fontSize: 12, cursor: 'pointer' };

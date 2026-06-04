@@ -9,13 +9,14 @@ export function PlayerPhoto({ player, size = 40, round = true }) {
   const [err, setErr] = useState(false);
   const url = photoUrl(player?.id);
   const radius = round ? '50%' : 8;
+  const frame = `2px solid ${C.border}`;
   if (!url || err) {
     const initials = (player?.name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
     return (
-      <div style={{ width: size, height: size, borderRadius: radius, background: C.surface2, color: C.muted, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.34, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
+      <div style={{ width: size, height: size, borderRadius: radius, background: C.surface2, color: C.muted, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.34, fontWeight: 800, flexShrink: 0, border: frame }}>{initials}</div>
     );
   }
-  return <img src={url} onError={() => setErr(true)} alt={player?.name || ''} loading="lazy" style={{ width: size, height: size, borderRadius: radius, objectFit: 'cover', objectPosition: 'top', background: C.surface2, flexShrink: 0 }} />;
+  return <img src={url} onError={() => setErr(true)} alt={player?.name || ''} loading="lazy" style={{ width: size, height: size, borderRadius: radius, objectFit: 'cover', objectPosition: 'top', background: C.surface2, flexShrink: 0, border: frame }} />;
 }
 
 // Photo + petite pastille de note (pour les listes de joueurs).

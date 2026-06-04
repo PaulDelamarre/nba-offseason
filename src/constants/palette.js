@@ -1,26 +1,28 @@
-// Palette sombre, accent orange « ballon » + bleu secondaire.
+// Thème « carte collector / arcade » : base parquet sombre + accents néon,
+// bordures épaisses, esprit carte NBA / NBA Jam.
 export const C = {
-  bg: '#0e0f12',
-  surface: '#16181c',
-  surface2: '#1c1f24',
-  border: '#2a2e34',
-  text: '#eceef2',
-  muted: '#838893',
-  accent: '#ef7d3a',     // orange basket
-  blue: '#4d9be6',
-  green: '#4cc38a',
-  yellow: '#e6c84d',
-  red: '#e0604f',
-  purple: '#a98be0',
+  bg: '#140f08',        // parquet sombre (bois chaud quasi noir)
+  surface: '#221a10',   // panneau / carte
+  surface2: '#2e2415',  // surélevé
+  border: '#43341e',    // bordure bois chaude
+  text: '#f7f1e3',      // blanc cassé chaud
+  muted: '#ab9c80',     // gris chaud
+  accent: '#ff7a18',    // orange néon (ballon)
+  blue: '#27d3ee',      // cyan néon
+  green: '#a3e635',     // vert lime néon
+  yellow: '#ffce3a',    // jaune néon
+  red: '#ff3b6b',       // magenta néon
+  purple: '#c084fc',    // violet néon
+  ink: '#140f08',       // texte foncé sur fond néon (pastilles)
 };
 
 // Code couleur des options de contrat (cellules de salaire) + départ en UFA.
 export const OPTION_COLORS = {
-  PO: '#4d9be6',   // player option (le joueur peut partir)
-  TO: '#ef7d3a',   // team option
-  ETO: '#a98be0',  // early termination option
-  NG: '#838893',   // non-garanti
-  UFA: '#e0604f',  // année de départ en agence libre
+  PO: '#27d3ee',   // player option (le joueur peut partir)
+  TO: '#ff7a18',   // team option
+  ETO: '#c084fc',  // early termination option
+  NG: '#ab9c80',   // non-garanti
+  UFA: '#ff3b6b',  // année de départ en agence libre
 };
 export const OPTION_LABEL = {
   PO: 'Player option', TO: 'Team option', ETO: 'ETO', NG: 'Non-garanti', UFA: 'UFA',
@@ -28,9 +30,9 @@ export const OPTION_LABEL = {
 
 // Statut financier d'une équipe selon les lignes du CBA.
 export const CAP_STATUS_COLORS = {
-  under: '#4cc38a',       // sous le cap (room)
-  over: '#e6c84d',        // au-dessus du cap
-  tax: '#ef7d3a',         // au-dessus de la luxury tax
-  apron1: '#e0604f',      // 1er apron
-  apron2: '#c0392b',      // 2e apron
+  under: '#a3e635',       // sous le cap (room)
+  over: '#ffce3a',        // au-dessus du cap
+  tax: '#ff7a18',         // au-dessus de la luxury tax
+  apron1: '#ff3b6b',      // 1er apron
+  apron2: '#e11d48',      // 2e apron
 };

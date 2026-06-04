@@ -17,7 +17,7 @@ export default function PlayerModal({ player, onClose }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(680px, 96vw)', maxHeight: '90vh', overflow: 'auto', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, borderTop: `4px solid ${t?.colors[0] || C.accent}` }}>
+      <div onClick={(e) => e.stopPropagation()} className="tcard" style={{ '--card-accent': t?.colors[0] || C.accent, '--card-glow': t?.colors[0] || C.accent, width: 'min(680px, 96vw)', maxHeight: '90vh', overflow: 'auto', borderRadius: 16 }}>
         {/* En-tête */}
         <div style={{ display: 'flex', gap: 16, padding: 18, borderBottom: `1px solid ${C.border}` }}>
           <PlayerPhoto player={player} size={92} round={false} />
@@ -33,8 +33,8 @@ export default function PlayerModal({ player, onClose }) {
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: C.muted }}>NOTE</div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: ratingColor(num(player.rating)) }}>{num(player.rating) || '–'}</div>
+            <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Note</div>
+            <div className="cond" style={{ fontSize: 42, fontWeight: 700, color: ratingColor(num(player.rating)), textShadow: `0 0 16px ${ratingColor(num(player.rating))}55` }}>{num(player.rating) || '–'}</div>
           </div>
         </div>
 
@@ -93,9 +93,9 @@ export default function PlayerModal({ player, onClose }) {
 
 function StatTile({ label, value, big }) {
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 6px', textAlign: 'center' }}>
-      <div style={{ fontSize: big ? 18 : 15, fontWeight: 800, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      <div style={{ fontSize: 10, color: C.muted }}>{label}</div>
+    <div style={{ background: C.bg, border: `2px solid ${C.border}`, borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+      <div className="cond" style={{ fontSize: big ? 21 : 16, fontWeight: 700, color: big ? C.accent : C.text, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      <div style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
     </div>
   );
 }

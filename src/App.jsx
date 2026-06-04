@@ -17,19 +17,21 @@ const NAV = [
 
 function Sidebar() {
   return (
-    <div style={{ width: 76, borderRight: `1px solid ${C.border}`, background: C.surface, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 14, gap: 6, flexShrink: 0 }}>
-      <div style={{ fontSize: 22, marginBottom: 10 }}>🏀</div>
+    <div style={{ width: 84, borderRight: `2px solid ${C.border}`, background: C.surface, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16, gap: 8, flexShrink: 0 }}>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, background: C.accent, boxShadow: `0 0 16px -2px ${C.accent}`, marginBottom: 12 }}>🏀</div>
       {NAV.map((n) => (
         <NavLink key={n.to} to={n.to} end={n.end}
           style={({ isActive }) => ({
-            width: 60, padding: '9px 4px', borderRadius: 8, textDecoration: 'none',
+            width: 66, padding: '9px 4px', borderRadius: 11, textDecoration: 'none',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            color: isActive ? C.accent : C.muted,
-            background: isActive ? 'rgba(239,125,58,0.12)' : 'transparent',
-            border: `1.5px solid ${isActive ? C.accent : 'transparent'}`,
+            color: isActive ? C.ink : C.muted,
+            background: isActive ? C.accent : 'transparent',
+            border: `2px solid ${isActive ? C.accent : C.border}`,
+            boxShadow: isActive ? `0 0 14px -3px ${C.accent}` : 'none',
+            fontFamily: "'Oswald', sans-serif",
           })}>
-          <span style={{ fontSize: 18 }}>{n.icon}</span>
-          <span style={{ fontSize: 10, fontWeight: 600 }}>{n.label}</span>
+          <span style={{ fontSize: 19 }}>{n.icon}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{n.label}</span>
         </NavLink>
       ))}
     </div>

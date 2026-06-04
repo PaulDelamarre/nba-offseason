@@ -32,8 +32,8 @@ export default function HomePage({ players, teams, meta }) {
             Trades, free agency, draft, extensions — le tout validé par un vrai moteur de salary cap (luxury tax, aprons, Bird rights). Puis tu valides et tu obtiens ton récap.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Link to="/gm" style={{ ...btn, background: C.accent, color: '#10120f', fontWeight: 800, fontSize: 16, padding: '13px 26px' }}>▶ Commencer l'entresaison</Link>
-            <Link to="/players" style={{ ...btn, fontSize: 16, padding: '13px 22px' }}>Parcourir les joueurs</Link>
+            <Link to="/gm" style={{ ...btn, background: C.accent, color: C.ink, border: `2px solid ${C.accent}`, fontSize: 17, padding: '14px 28px', boxShadow: `0 0 20px -3px ${C.accent}` }}>▶ Commencer l'entresaison</Link>
+            <Link to="/players" style={{ ...btn, fontSize: 16, padding: '14px 22px' }}>Parcourir les joueurs</Link>
           </div>
 
           <div style={{ display: 'flex', gap: 30, flexWrap: 'wrap', marginTop: 34 }}>
@@ -94,11 +94,12 @@ function Strip({ children }) {
 function PlayerCard({ p, sub, onClick }) {
   const t = TEAM_BY_ABBR[p.team];
   const r = num(p.rating);
+  const teamCol = t?.colors[0] || C.accent;
   return (
-    <button onClick={onClick} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 14, borderRadius: 12, cursor: 'pointer', background: C.surface, border: `1px solid ${C.border}`, borderTop: `3px solid ${t?.colors[0] || C.accent}`, color: C.text }}>
-      <span style={{ position: 'absolute', top: 8, right: 8, background: ratingColor(r), color: '#10120f', fontWeight: 800, fontSize: 12, borderRadius: 7, padding: '1px 6px' }}>{r || '–'}</span>
-      <PlayerPhoto player={p} size={64} round={false} />
-      <div style={{ fontWeight: 700, fontSize: 13, textAlign: 'center', lineHeight: 1.15 }}>{p.name}</div>
+    <button onClick={onClick} className="tcard" style={{ '--card-accent': teamCol, '--card-glow': teamCol, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, padding: '18px 12px 14px', borderRadius: 14, cursor: 'pointer', color: C.text, marginTop: 8 }}>
+      <span style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: ratingColor(r), color: C.ink, fontWeight: 700, fontSize: 13, borderRadius: 9, padding: '2px 10px', boxShadow: `0 0 12px -2px ${ratingColor(r)}`, fontFamily: "'Oswald', sans-serif", letterSpacing: 0.5, whiteSpace: 'nowrap' }}>★ {r || '–'}</span>
+      <PlayerPhoto player={p} size={74} round={false} />
+      <div className="cond" style={{ fontWeight: 700, fontSize: 15, textAlign: 'center', lineHeight: 1.05, textTransform: 'uppercase' }}>{p.name}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: C.muted }}>
         <TeamChip abbr={p.team} size={16} /> {p.pos}
       </div>
@@ -108,10 +109,11 @@ function PlayerCard({ p, sub, onClick }) {
 }
 
 function Feature({ to, icon, title, desc, accent }) {
+  const col = accent ? C.accent : C.border;
   return (
-    <Link to={to} style={{ textDecoration: 'none', color: C.text, padding: 18, borderRadius: 12, background: C.surface, border: `1px solid ${accent ? C.accent : C.border}`, display: 'block' }}>
-      <div style={{ fontSize: 24 }}>{icon}</div>
-      <div style={{ fontSize: 16, fontWeight: 800, marginTop: 8 }}>{title}</div>
+    <Link to={to} className="tcard" style={{ '--card-accent': col, '--card-glow': accent ? C.accent : 'transparent', textDecoration: 'none', color: C.text, padding: 18, borderRadius: 14, display: 'block' }}>
+      <div style={{ fontSize: 26 }}>{icon}</div>
+      <div className="cond" style={{ fontSize: 18, fontWeight: 700, marginTop: 8, textTransform: 'uppercase' }}>{title}</div>
       <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{desc}</div>
     </Link>
   );
@@ -126,4 +128,4 @@ function Stat({ n, l }) {
   );
 }
 
-const btn = { textDecoration: 'none', color: C.text, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 18px', display: 'inline-block' };
+const btn = { textDecoration: 'none', color: C.text, background: C.surface2, border: `2px solid ${C.border}`, borderRadius: 11, padding: '11px 18px', display: 'inline-block', fontFamily: "'Oswald', sans-serif", fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' };
