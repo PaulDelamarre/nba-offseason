@@ -6,10 +6,11 @@ import { fmtUSD, fmtUSDfull, num } from '../utils/format.js';
 import {
   isFreeAgent, faType, capHold, availableMethods, teamCapState,
   minSalary, maxSalary, yearsOfService, deadMoneyFor, guaranteedRemaining,
-  canExtend, extensionSchedule, maxExtensionYears, teamGuaranteedByYear, lastGuaranteedSeason,
+  canExtend, extensionSchedule, maxExtensionYears, teamCommitmentsByYear, lastGuaranteedSeason,
+  deadMoneyByYear,
 } from '../utils/contracts.js';
 import { effectiveTeam } from '../utils/players.js';
-import { nextPick, teamAt, takenRanks, picksOfTeam, LAST_PICK, rookieSalary } from '../utils/draft.js';
+import { nextPick, teamAt, takenRanks, picksOfTeam, LAST_PICK, rookieSalary, prospectPosGroup } from '../utils/draft.js';
 import { PROSPECTS_2026, PROSPECT_STATS } from '../constants/draft.js';
 import { capSummary } from '../utils/cap.js';
 import { useGM } from '../context/GMContext.jsx';
@@ -110,26 +111,83 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
   const signings = gm.state.signings;
   const [extendSel, setExtendSel] = useState(null);
   const extMap = new Map(gm.state.extensions.map((e) => [e.playerId, e]));
-  const payrollByYear = teamGuaranteedByYear(players, myTeam, gm.state.extensions, gm.moveMap);
+  const payrollByYear = teamCommitmentsByYear(players, myTeam, gm.state.extensions, gm.moveMap, gm.state.waived);
 
-  // 5 majeur : joueurs disponibles = roster effectif (non libéré) + recrues FA.
+  // 5 majeur : joueurs disponibles = roster effectif (non libéré) + recrues FA + recrues draft.
   const myDraft = picksOfTeam(gm.state.draftPicks, myTeam, season, gm.slotOwners);
+  // Les rookies draftés ne sont pas dans le dataset : on fabrique un « joueur »
+  // synthétique (id dft-<pick>) pour qu'ils apparaissent au banc / sur le terrain.
+  const draftRookies = useMemo(() => myDraft.map((d) => {
+    const pr = PROSPECTS_2026.find((p) => p.rank === d.rank);
+    return {
+      id: `dft-${d.pick}`,
+      name: pr?.name || `Pick #${d.pick}`,
+      pos: pr?.pos || '',
+      posGroup: prospectPosGroup(pr?.pos),
+      age: pr?.age ?? null,
+      rating: 0,
+      _rating: 0,
+      _draft: true,
+      _pick: d.pick,
+      _sal: d.salary,
+      salaries: { '2026-27': d.salary },
+    };
+  }), [gm.state.draftPicks, gm.slotOwners, myTeam, season]);
   const lineupRoster = useMemo(() => {
     const seen = new Set();
     const list = [...contract.filter((p) => !waivedMap.has(p.id))];
-    for (const s of signings) { const p = byId.get(s.playerId); if (p) list.push({ ...p, _rating: num(p.rating) }); }
+    for (const s of signings) { const p = byId.get(s.playerId); if (p) list.push({ ...p, _rating: num(p.rating), _signed: true }); }
+    for (const r of draftRookies) list.push(r);
     return list.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
-  }, [contract, signings, byId, gm.state.waived]);
+  }, [contract, signings, byId, gm.state.waived, draftRookies]);
+  // Liste « Sous contrat » unifiée = joueurs du dataset + signatures FA + rookies
+  // draftés, triés par salaire. Chaque ligne porte un _kind pour adapter les actions.
+  const rosterRows = useMemo(() => {
+    const seen = new Set();
+    const rows = contract.map((p) => { seen.add(p.id); return { ...p, _kind: p._acquired ? 'trade' : 'contract' }; });
+    for (const s of signings) {
+      if (seen.has(s.playerId)) continue;
+      const p = byId.get(s.playerId);
+      if (!p) continue;
+      seen.add(s.playerId);
+      const endYear = PAY_SEASONS[Math.min(s.years, PAY_SEASONS.length) - 1] || season;
+      rows.push({ ...p, _kind: 'signed', _rating: num(p.rating), _sal: num(s.salary), _endYear: endYear, _signMethod: s.method });
+    }
+    for (const r of draftRookies) rows.push({ ...r, _kind: 'draft', _endYear: season });
+    return rows.sort((a, b) => num(b._sal) - num(a._sal));
+  }, [contract, signings, byId, draftRookies, season]);
   const payroll = useMemo(() => buildPayroll(players, myTeam, gm, byId, myDraft), [players, myTeam, gm.moveMap, gm.state.extensions, gm.state.signings, gm.state.waived, gm.state.draftPicks, gm.slotOwners]);
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <CourtLineup roster={lineupRoster} lineup={gm.state.lineup} onSet={gm.setLineupSlot} byId={byId} />
+      <CourtLineup roster={lineupRoster} lineup={gm.state.lineup} onSet={gm.setLineupSlot} />
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignContent: 'start' }}>
       {/* Joueurs sous contrat */}
       <div>
-        <SectionTitle color={C.text}>Sous contrat 2026-27 ({contract.length})</SectionTitle>
-        {contract.map((p) => {
+        <SectionTitle color={C.text}>Sous contrat 2026-27 ({rosterRows.length})</SectionTitle>
+        {rosterRows.map((p) => {
+          // Recrues (FA signée / rookie draftée) : ligne simplifiée + bouton « retirer ».
+          if (p._kind === 'signed' || p._kind === 'draft') {
+            const isDraft = p._kind === 'draft';
+            const badge = isDraft ? { label: 'draft', color: C.accent } : { label: 'signé', color: C.blue };
+            const sub = isDraft ? `pick #${p._pick}` : (p._signMethod ? `signé ${p._signMethod} · jusqu'en ${p._endYear}` : `jusqu'en ${p._endYear}`);
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderBottom: `1px solid ${C.border}` }}>
+                <div onClick={() => !isDraft && openFiche(p)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: isDraft ? 'default' : 'pointer' }}>
+                  <PlayerAvatar player={p} size={32} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name} <span style={{ color: badge.color, fontSize: 10, fontWeight: 800 }}>● {badge.label}</span></div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{p.pos}{p.age ? ` · ${p.age} ans` : ''} · {sub}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', minWidth: 70 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(p._sal)}</div>
+                </div>
+                <button onClick={() => (isDraft ? gm.undoDraftPick(p._pick) : gm.unsign(p.id))} style={miniBtn}>retirer</button>
+              </div>
+            );
+          }
+          // Joueurs du dataset sous contrat (ou acquis via trade) : actions complètes.
           const mode = waivedMap.get(p.id);
           const ext = extMap.get(p.id);
           const g = guaranteedRemaining(p, '2026-27');
@@ -208,17 +266,23 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
           <SectionTitle color={C.purple}>Engagements garantis</SectionTitle>
           {payrollByYear.map((y) => {
             const cap0 = CAP_YEARS[season].salaryCap;
+            const livePct = Math.max(0, Math.min(100, (y.live / cap0) * 100));
+            const deadPct = Math.max(0, Math.min(100 - livePct, (y.dead / cap0) * 100));
             return (
-              <div key={y.season} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '2px 0' }}>
+              <div key={y.season} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '2px 0' }} title={`Salaires ${fmtUSD(y.live)}${y.dead ? ` + dead money ${fmtUSD(y.dead)}` : ''}`}>
                 <span style={{ width: 56, color: C.muted }}>{y.season}</span>
-                <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, (y.total / cap0) * 100)}%`, height: '100%', background: y.total > cap0 ? C.accent : C.purple }} />
+                <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden', display: 'flex' }}>
+                  <div style={{ width: `${livePct}%`, height: '100%', background: C.purple }} />
+                  <div style={{ width: `${deadPct}%`, height: '100%', background: C.red }} />
                 </div>
-                <b style={{ width: 60, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(y.total)}</b>
+                <b style={{ width: 60, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: y.total > cap0 ? C.accent : C.text }}>{fmtUSD(y.total)}</b>
               </div>
             );
           })}
-          <div style={{ marginTop: 6, fontSize: 10, color: C.muted }}>vs cap {fmtUSD(CAP_YEARS[season].salaryCap)} (réf. {season})</div>
+          <div style={{ marginTop: 6, fontSize: 10, color: C.muted, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <span><span style={{ color: C.purple }}>■</span> salaires <span style={{ color: C.red }}>■</span> dead money</span>
+            <span>vs cap {fmtUSD(CAP_YEARS[season].salaryCap)} (réf. {season})</span>
+          </div>
         </div>
 
         {signings.length > 0 && (
@@ -232,6 +296,22 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
                   <span style={{ color: C.muted, fontSize: 11 }}>{s.method} · {s.years}a</span>
                   <b style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(s.salary)}</b>
                   <button onClick={() => gm.unsign(s.playerId)} style={miniBtn}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {myDraft.length > 0 && (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+            <SectionTitle color={C.accent}>Recrues draft ({myDraft.length})</SectionTitle>
+            {myDraft.map((d) => {
+              const pr = PROSPECTS_2026.find((p) => p.rank === d.rank);
+              return (
+                <div key={d.pick} style={row}>
+                  <span style={{ flex: 1 }}>{pr?.name || `pick #${d.pick}`}</span>
+                  <span style={{ color: C.muted, fontSize: 11 }}>#{d.pick} · {pr?.pos || '—'}</span>
+                  <b style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(d.salary)}</b>
                 </div>
               );
             })}
@@ -258,11 +338,19 @@ const pos5Of = (p) => {
   return ['PG', 'SG', 'SF', 'PF', 'C'].includes(t) ? t : null;
 };
 
-function CourtLineup({ roster, lineup, onSet, byId }) {
+function CourtLineup({ roster, lineup, onSet }) {
   const [active, setActive] = useState(null);
+  // Index par id construit depuis le roster (inclut FA signés et rookies draftés,
+  // qui ne sont pas dans le dataset global).
+  const rosterById = useMemo(() => new Map(roster.map((p) => [p.id, p])), [roster]);
   const rosterIds = useMemo(() => new Set(roster.map((p) => p.id)), [roster]);
   const used = new Set(Object.values(lineup).filter(Boolean));
-  const bench = roster.filter((p) => !used.has(p.id));
+  // Recrues d'abord (rookies draftés, puis signatures FA) pour qu'une nouvelle
+  // acquisition soit visible en haut du banc et jamais cachée sous le scroll.
+  const benchRank = (p) => (p._draft ? 0 : p._signed ? 1 : 2);
+  const bench = roster
+    .filter((p) => !used.has(p.id))
+    .sort((a, b) => benchRank(a) - benchRank(b) || num(b._rating ?? b.rating) - num(a._rating ?? a.rating));
 
   function assign(p) {
     const target = active || pos5Of(p) || COURT_SPOTS.find((s) => !lineup[s.pos])?.pos || 'PG';
@@ -285,7 +373,7 @@ function CourtLineup({ roster, lineup, onSet, byId }) {
           </svg>
           {COURT_SPOTS.map((s) => {
             const pid = lineup[s.pos];
-            const p = (pid && rosterIds.has(pid)) ? byId.get(pid) : null;
+            const p = (pid && rosterIds.has(pid)) ? rosterById.get(pid) : null;
             const isActive = active === s.pos;
             return (
               <div key={s.pos} onClick={() => (p ? onSet(s.pos, null) : setActive(isActive ? null : s.pos))}
@@ -307,14 +395,18 @@ function CourtLineup({ roster, lineup, onSet, byId }) {
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <SectionTitle color={C.muted}>Banc ({bench.length})</SectionTitle>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignContent: 'flex-start', overflow: 'auto', maxHeight: 290 }}>
-          {bench.map((p) => (
-            <button key={p.id} onClick={() => assign(p)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', background: C.surface2, color: C.text, border: `1px solid ${C.border}` }}>
-              <PlayerAvatar player={p} size={22} />
-              <span style={{ fontSize: 12 }}>{p.name}</span>
-              <span style={{ fontSize: 10, color: C.muted }}>{pos5Of(p) || p.posGroup}</span>
-            </button>
-          ))}
+          {bench.map((p) => {
+            const tag = p._draft ? { label: 'DRAFT', color: C.accent } : p._signed ? { label: 'FA', color: C.blue } : null;
+            return (
+              <button key={p.id} onClick={() => assign(p)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', background: C.surface2, color: C.text, border: `1px solid ${tag ? tag.color : C.border}` }}>
+                <PlayerAvatar player={p} size={22} />
+                <span style={{ fontSize: 12 }}>{p.name}</span>
+                <span style={{ fontSize: 10, color: C.muted }}>{pos5Of(p) || p.posGroup}</span>
+                {tag && <span style={{ fontSize: 8, fontWeight: 800, color: C.ink, background: tag.color, borderRadius: 4, padding: '1px 4px', letterSpacing: 0.4 }}>{tag.label}</span>}
+              </button>
+            );
+          })}
           {!bench.length && <div style={{ fontSize: 12, color: C.muted }}>Tout le monde est sur le terrain ou non disponible.</div>}
         </div>
       </div>
@@ -332,11 +424,19 @@ function ufaFromByYear(byYear) {
 }
 
 function buildPayroll(players, myTeam, gm, byId, myDraft) {
-  const waivedSet = new Set(gm.state.waived.map((w) => w.playerId));
+  const waivedMap = new Map(gm.state.waived.map((w) => [w.playerId, w.mode]));
   const extMap = new Map(gm.state.extensions.map((e) => [e.playerId, e]));
   const rows = [];
   for (const p of players) {
-    if (effectiveTeam(p, gm.moveMap) !== myTeam || waivedSet.has(p.id)) continue;
+    if (effectiveTeam(p, gm.moveMap) !== myTeam) continue;
+    if (waivedMap.has(p.id)) {
+      const mode = waivedMap.get(p.id);
+      const byYear = deadMoneyByYear(p, mode);
+      if (PAY_SEASONS.some((s) => byYear[s] > 0)) {
+        rows.push({ id: p.id, name: p.name, kind: 'dead', deadMode: mode, byYear, opts: {}, ufa: null });
+      }
+      continue;
+    }
     const e = extMap.get(p.id);
     const sch = e ? extensionSchedule(p, e) : {};
     const byYear = {}; let any = false;
@@ -354,19 +454,51 @@ function buildPayroll(players, myTeam, gm, byId, myDraft) {
     const byYear = {}; PAY_SEASONS.forEach((sea) => { byYear[sea] = 0; }); byYear['2026-27'] = d.salary;
     rows.push({ id: `dft-${d.pick}`, name: PROSPECTS_2026.find((p) => p.rank === d.rank)?.name || `pick #${d.pick}`, kind: 'draft', byYear, opts: {}, ufa: null });
   }
-  rows.sort((a, b) => b.byYear['2026-27'] - a.byYear['2026-27']);
+  // Deux sous-groupes : joueurs encore là (active) puis dead money.
+  const activeRows = rows.filter((r) => r.kind !== 'dead').sort((a, b) => b.byYear['2026-27'] - a.byYear['2026-27']);
+  const deadRows = rows.filter((r) => r.kind === 'dead').sort((a, b) => b.byYear['2026-27'] - a.byYear['2026-27']);
+  const sumBy = (list) => { const t = {}; PAY_SEASONS.forEach((s) => { t[s] = list.reduce((a, r) => a + r.byYear[s], 0); }); return t; };
+  const liveTotals = sumBy(activeRows);
+  const deadTotals = sumBy(deadRows);
   const totals = {};
-  PAY_SEASONS.forEach((s) => { totals[s] = rows.reduce((a, r) => a + r.byYear[s], 0); });
-  return { rows, totals };
+  PAY_SEASONS.forEach((s) => { totals[s] = liveTotals[s] + deadTotals[s]; });
+  return { activeRows, deadRows, liveTotals, deadTotals, totals };
 }
 
-const KIND_DOT = { contrat: C.muted, trade: C.green, signé: C.blue, draft: C.accent };
+const KIND_DOT = { contrat: C.muted, trade: C.green, signé: C.blue, draft: C.accent, dead: C.red };
+
+function PayrollRow({ r }) {
+  const isDead = r.kind === 'dead';
+  return (
+    <tr style={{ borderTop: `1px solid ${C.border}` }}>
+      <td style={{ padding: '5px 8px', color: isDead ? C.red : C.text }}>
+        <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: KIND_DOT[r.kind], marginRight: 6 }} />
+        <span style={{ textDecoration: isDead ? 'line-through' : 'none' }}>{r.name}</span>
+        {isDead && <span style={{ fontSize: 9, fontWeight: 800, color: C.red, marginLeft: 6, letterSpacing: 0.3 }}>{r.deadMode === 'stretch' ? 'STRETCH' : 'COUPÉ'}</span>}
+      </td>
+      {PAY_SEASONS.map((s) => {
+        const v = r.byYear[s];
+        const opt = r.opts[s];
+        const isUfa = s === r.ufa;
+        const tint = isDead ? C.red : opt ? OPTION_COLORS[opt] : isUfa ? OPTION_COLORS.UFA : null;
+        return (
+          <td key={s} title={isDead ? `Dead money (${r.deadMode === 'stretch' ? 'étalé' : 'waive'})` : opt ? OPTION_LABEL[opt] : isUfa ? 'Départ en agence libre (UFA)' : ''}
+            style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', background: tint && !isDead ? `${tint}22` : 'transparent', color: isDead ? (v ? C.red : C.border) : v ? (opt ? OPTION_COLORS[opt] : C.text) : (isUfa ? OPTION_COLORS.UFA : C.border), fontWeight: opt || isUfa ? 700 : 400 }}>
+            {v ? <>{fmtUSD(v)}{opt && <sup style={{ fontSize: 8, marginLeft: 1 }}>{opt}</sup>}</> : (isUfa ? 'UFA' : '—')}
+          </td>
+        );
+      })}
+    </tr>
+  );
+}
 
 function PayrollTable({ payroll, season }) {
   const Y = CAP_YEARS[season];
+  const { activeRows, deadRows, deadTotals, totals } = payroll;
+  const hasDead = deadRows.length > 0;
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
-      <SectionTitle color={C.text}>Tableau de paie ({payroll.rows.length} joueurs)</SectionTitle>
+      <SectionTitle color={C.text}>Tableau de paie ({activeRows.length} joueurs{hasDead ? ` + ${deadRows.length} dead money` : ''})</SectionTitle>
       <div style={{ overflow: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
@@ -375,45 +507,42 @@ function PayrollTable({ payroll, season }) {
               {PAY_SEASONS.map((s) => <th key={s} style={{ padding: '6px 8px', fontWeight: 600 }}>{s}</th>)}
             </tr>
           </thead>
+          {/* Sous-groupe 1 : joueurs encore là */}
           <tbody>
-            {payroll.rows.map((r) => (
-              <tr key={r.id} style={{ borderTop: `1px solid ${C.border}` }}>
-                <td style={{ padding: '5px 8px' }}>
-                  <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: KIND_DOT[r.kind], marginRight: 6 }} />
-                  {r.name}
-                </td>
-                {PAY_SEASONS.map((s) => {
-                  const v = r.byYear[s];
-                  const opt = r.opts[s];
-                  const isUfa = s === r.ufa;
-                  const tint = opt ? OPTION_COLORS[opt] : isUfa ? OPTION_COLORS.UFA : null;
-                  return (
-                    <td key={s} title={opt ? OPTION_LABEL[opt] : isUfa ? 'Départ en agence libre (UFA)' : ''}
-                      style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', background: tint ? `${tint}22` : 'transparent', color: v ? (opt ? OPTION_COLORS[opt] : C.text) : (isUfa ? OPTION_COLORS.UFA : C.border), fontWeight: opt || isUfa ? 700 : 400 }}>
-                      {v ? <>{fmtUSD(v)}{opt && <sup style={{ fontSize: 8, marginLeft: 1 }}>{opt}</sup>}</> : (isUfa ? 'UFA' : '—')}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {activeRows.map((r) => <PayrollRow key={r.id} r={r} />)}
           </tbody>
+          {/* Sous-groupe 2 : dead money (joueurs libérés) */}
+          {hasDead && (
+            <tbody>
+              <tr>
+                <td colSpan={PAY_SEASONS.length + 1} style={{ padding: '8px 8px 3px', borderTop: `2px solid ${C.border}` }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase', color: C.red, fontFamily: "'Oswald', sans-serif" }}>● Dead money</span>
+                </td>
+              </tr>
+              {deadRows.map((r) => <PayrollRow key={r.id} r={r} />)}
+              <tr style={{ fontWeight: 700, color: C.red }}>
+                <td style={{ padding: '4px 8px' }}>Sous-total dead money</td>
+                {PAY_SEASONS.map((s) => <td key={s} style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: deadTotals[s] ? C.red : C.border }}>{deadTotals[s] ? fmtUSD(deadTotals[s]) : '—'}</td>)}
+              </tr>
+            </tbody>
+          )}
           <tfoot>
             <tr style={{ borderTop: `2px solid ${C.border}`, fontWeight: 800 }}>
-              <td style={{ padding: '7px 8px' }}>Total</td>
+              <td style={{ padding: '7px 8px' }}>Total{hasDead ? ' (avec dead money)' : ''}</td>
               {PAY_SEASONS.map((s) => {
-                const over = payroll.totals[s] > Y.luxuryTax;
-                return <td key={s} style={{ padding: '7px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: over ? C.accent : C.text }}>{fmtUSD(payroll.totals[s])}</td>;
+                const over = totals[s] > Y.luxuryTax;
+                return <td key={s} style={{ padding: '7px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: over ? C.accent : C.text }}>{fmtUSD(totals[s])}</td>;
               })}
             </tr>
             <tr style={{ color: C.muted, fontSize: 11 }}>
               <td style={{ padding: '2px 8px' }}>vs cap {fmtUSD(Y.salaryCap)}</td>
-              {PAY_SEASONS.map((s) => <td key={s} style={{ padding: '2px 8px', textAlign: 'right' }}>{payroll.totals[s] > Y.salaryCap ? `+${fmtUSD(payroll.totals[s] - Y.salaryCap)}` : `${fmtUSD(Y.salaryCap - payroll.totals[s])} room`}</td>)}
+              {PAY_SEASONS.map((s) => <td key={s} style={{ padding: '2px 8px', textAlign: 'right' }}>{totals[s] > Y.salaryCap ? `+${fmtUSD(totals[s] - Y.salaryCap)}` : `${fmtUSD(Y.salaryCap - totals[s])} room`}</td>)}
             </tr>
           </tfoot>
         </table>
       </div>
       <div style={{ marginTop: 8, fontSize: 10, color: C.muted, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <span><span style={{ color: KIND_DOT.contrat }}>●</span> contrat <span style={{ color: KIND_DOT.trade }}>●</span> acquis <span style={{ color: KIND_DOT.signé }}>●</span> signé <span style={{ color: KIND_DOT.draft }}>●</span> draft</span>
+        <span><span style={{ color: KIND_DOT.contrat }}>●</span> contrat <span style={{ color: KIND_DOT.trade }}>●</span> acquis <span style={{ color: KIND_DOT.signé }}>●</span> signé <span style={{ color: KIND_DOT.draft }}>●</span> draft <span style={{ color: KIND_DOT.dead }}>●</span> dead money</span>
         <span style={{ display: 'flex', gap: 10 }}>
           {['PO', 'TO', 'ETO', 'NG', 'UFA'].map((k) => (
             <span key={k} style={{ color: OPTION_COLORS[k], fontWeight: 700 }}>■ {OPTION_LABEL[k]}</span>

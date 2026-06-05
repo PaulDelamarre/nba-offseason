@@ -70,6 +70,45 @@ export function deadMoneyFor(p, mode, season = '2026-27') {
   return Math.round(thisSeason);
 }
 
+// Dead money répartie sur toutes les saisons (pour les tableaux pluriannuels).
+// waive  : le garanti de chaque saison reste au cap tel quel.
+// stretch: le garanti total est étalé à parts égales sur (2 × années + 1) saisons.
+export function deadMoneyByYear(p, mode) {
+  const g = guaranteedRemaining(p, '2026-27');
+  const byYear = {};
+  SEASONS.forEach((s) => { byYear[s] = 0; });
+  if (g.total <= 0) return byYear;
+  if (mode === 'stretch') {
+    const span = 2 * g.years + 1;
+    const per = Math.round(g.total / span);
+    SEASONS.forEach((s, i) => { if (i < span) byYear[s] = per; });
+  } else {
+    SEASONS.forEach((s) => { byYear[s] = num(p.salaries?.[s]); });
+  }
+  return byYear;
+}
+
+// Engagements par saison, séparés en « live » (joueurs encore là, extensions
+// incluses) et « dead » (dead money des joueurs libérés, étalement appliqué).
+export function teamCommitmentsByYear(players, myTeam, extensions = [], moveMap, waived = []) {
+  const extMap = new Map(extensions.map((e) => [e.playerId, e]));
+  const waivedMap = new Map(waived.map((w) => [w.playerId, w.mode]));
+  const roster = players.filter((p) => effectiveTeam(p, moveMap) === myTeam);
+  return SEASONS.map((season) => {
+    let live = 0; let dead = 0;
+    for (const p of roster) {
+      if (waivedMap.has(p.id)) {
+        dead += deadMoneyByYear(p, waivedMap.get(p.id))[season] || 0;
+      } else {
+        live += num(p.salaries?.[season]);
+        const e = extMap.get(p.id);
+        if (e) live += extensionSchedule(p, e)[season] || 0;
+      }
+    }
+    return { season, live, dead, total: live + dead };
+  });
+}
+
 // Ancienneté (YOS) : valeur scrapée, sinon estimée via l'âge (FA hors roster).
 export function yearsOfService(p) {
   if (p?.exp != null) return num(p.exp);
