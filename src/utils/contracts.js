@@ -154,6 +154,18 @@ export function capHold(p, year) {
   return Math.round(Math.min(maxS, Math.max(minS, prev * factor)));
 }
 
+// Masse salariale projetée après une signature, et si elle viole le hard cap
+// imposé par la méthode (non-taxpayer MLE / BAE → 1er apron ; taxpayer MLE →
+// 2e apron). `hold` = cap hold du joueur s'il est déjà compté dans taxSalary
+// (cas d'un FA maison) et qu'on remplace par le vrai salaire.
+export function signingHardCap(method, salary, taxSalary, hold, year) {
+  const Y = capYear(year);
+  const limit = method?.hardCap === '1er apron' ? Y.firstApron
+    : method?.hardCap === '2e apron' ? Y.secondApron : null;
+  const projected = num(taxSalary) + num(salary) - num(hold);
+  return { limit, projected, breach: limit != null && projected > limit + 1 };
+}
+
 // Méthodes de signature disponibles pour MON équipe sur un FA donné, selon la
 // position cap. Chaque méthode = { key, label, maxSalary, maxYears, hardCap }.
 export function availableMethods({ taxSalary, capRoomAvail, capRoomBasis }, player, isOwnFA, year) {

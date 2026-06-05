@@ -4,7 +4,7 @@ import { TEAMS, TEAM_BY_ABBR } from '../constants/teams.js';
 import { CAP_YEARS } from '../constants/cba.js';
 import { fmtUSD, fmtUSDfull, num } from '../utils/format.js';
 import {
-  isFreeAgent, faType, capHold, availableMethods, teamCapState,
+  isFreeAgent, faType, capHold, availableMethods, teamCapState, signingHardCap,
   minSalary, maxSalary, yearsOfService, deadMoneyFor, guaranteedRemaining,
   canExtend, extensionSchedule, maxExtensionYears, teamCommitmentsByYear, lastGuaranteedSeason,
   deadMoneyByYear,
@@ -660,6 +660,10 @@ function SignPanel({ player, cap, season, myTeam, onSign, onClose }) {
 
   if (!method) return <div style={{ padding: 20, color: C.red, fontSize: 13 }}>Aucune méthode de signature disponible (2e apron ?).</div>;
   const total = salary * years;
+  // Hard cap : si la méthode en pose un, la signature ne peut pas franchir l'apron.
+  const hold = isOwn ? capHold(player, season) : 0;
+  const hc = signingHardCap(method, salary, cap.taxSalary, hold, season);
+  const isRFA = (player._type || faType(player)) === 'RFA' && !isOwn;
 
   return (
     <div style={{ padding: 16 }}>
@@ -681,6 +685,7 @@ function SignPanel({ player, cap, season, myTeam, onSign, onClose }) {
         ))}
       </div>
       {method.hardCap && <div style={{ marginTop: 6, fontSize: 11, color: C.yellow }}>⚠ Cette exception pose un hard cap au {method.hardCap}.</div>}
+      {isRFA && <div style={{ marginTop: 4, fontSize: 11, color: C.blue }}>ℹ RFA : son équipe d'origine peut s'aligner sur ton offre (droit de match).</div>}
 
       <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
         <span style={{ color: C.muted }}>Salaire annuel</span>
@@ -696,9 +701,14 @@ function SignPanel({ player, cap, season, myTeam, onSign, onClose }) {
         <span style={{ marginLeft: 'auto', color: C.muted }}>~{fmtUSD(total)} total</span>
       </div>
 
-      <button onClick={() => onSign({ playerId: player.id, salary, years, method: method.key })}
-        style={{ marginTop: 14, width: '100%', padding: '10px', borderRadius: 9, border: 'none', cursor: 'pointer', background: C.accent, color: '#10120f', fontWeight: 800, fontSize: 14 }}>
-        ✍ Signer {player.name.split(' ').slice(-1)[0]} — {fmtUSD(salary)}/an × {years}
+      {hc.breach && (
+        <div style={{ marginTop: 12, fontSize: 12, color: C.red, fontWeight: 600, background: 'rgba(255,59,107,0.10)', border: `1px solid ${C.red}`, borderRadius: 8, padding: '8px 10px' }}>
+          🚫 Hard cap dépassé : avec cette signature la masse passerait à {fmtUSD(hc.projected)}, au-dessus du {method.hardCap} ({fmtUSD(hc.limit)}). Baisse le salaire ou choisis une autre méthode.
+        </div>
+      )}
+      <button onClick={() => !hc.breach && onSign({ playerId: player.id, salary, years, method: method.key })} disabled={hc.breach}
+        style={{ marginTop: 14, width: '100%', padding: '10px', borderRadius: 9, border: 'none', cursor: hc.breach ? 'not-allowed' : 'pointer', background: hc.breach ? C.border : C.accent, color: hc.breach ? C.muted : '#10120f', fontWeight: 800, fontSize: 14, opacity: hc.breach ? 0.7 : 1 }}>
+        {hc.breach ? '🚫 Signature interdite (hard cap)' : <>✍ Signer {player.name.split(' ').slice(-1)[0]} — {fmtUSD(salary)}/an × {years}</>}
       </button>
     </div>
   );

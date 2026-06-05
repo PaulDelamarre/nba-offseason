@@ -1,8 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import { minSalary, maxSalary, isFreeAgent, capHold, availableMethods, teamCapState, deadMoneyFor, canExtend, extensionSchedule, maxExtensionYears, teamGuaranteedByYear } from './contracts.js';
+import { minSalary, maxSalary, isFreeAgent, capHold, availableMethods, teamCapState, deadMoneyFor, canExtend, extensionSchedule, maxExtensionYears, teamGuaranteedByYear, signingHardCap } from './contracts.js';
 
-const Y = '2026-27';
+const Y = '2026-27'; // cap 165M, tax 201M, apron1 209M, apron2 222M
 const keys = (ms) => ms.map((m) => m.key);
+
+describe('signingHardCap — hard cap appliqué à la signature', () => {
+  const nonTaxMLE = { key: 'mle', hardCap: '1er apron' };
+  const taxMLE = { key: 'taxMLE', hardCap: '2e apron' };
+  const noHC = { key: 'room', hardCap: null };
+  it('non-taxpayer MLE : bloque si la masse franchit le 1er apron', () => {
+    // masse 200M + MLE 15M = 215M > 209M → breach
+    expect(signingHardCap(nonTaxMLE, 15_000_000, 200_000_000, 0, Y).breach).toBe(true);
+    // masse 190M + 15M = 205M < 209M → ok
+    expect(signingHardCap(nonTaxMLE, 15_000_000, 190_000_000, 0, Y).breach).toBe(false);
+  });
+  it('taxpayer MLE : seuil au 2e apron', () => {
+    expect(signingHardCap(taxMLE, 6_000_000, 218_000_000, 0, Y).breach).toBe(true); // 224M > 222M
+    expect(signingHardCap(taxMLE, 6_000_000, 214_000_000, 0, Y).breach).toBe(false); // 220M < 222M
+  });
+  it('méthode sans hard cap : jamais de breach', () => {
+    expect(signingHardCap(noHC, 30_000_000, 230_000_000, 0, Y).breach).toBe(false);
+  });
+  it('FA maison : le cap hold est remplacé (déduit de la projection)', () => {
+    // masse 205M dont 12M de hold ; signer à 15M → 205 - 12 + 15 = 208M < 209M → ok
+    expect(signingHardCap(nonTaxMLE, 15_000_000, 205_000_000, 12_000_000, Y).breach).toBe(false);
+  });
+});
 
 describe('min / max salary par ancienneté', () => {
   it('minimum par YOS (avec plafond à 10 ans)', () => {

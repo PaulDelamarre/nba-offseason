@@ -85,6 +85,12 @@ describe('sign-and-trade (hard cap 1er apron pour l’acquéreur)', () => {
     const ko = evaluateTeam({ abbr: 'S', preSalary: 207_000_000, rosterCount: 15, outgoing: [p(10_000_000)], incoming: [p(14_000_000)], signTradeIn: true }, Y);
     expect(ko.legal).toBe(false); // post 211M > 209M
   });
+  it('équipe au-dessus du 1er apron : acquisition S&T interdite (même équilibrée)', () => {
+    // 2e apron, échange parfaitement équilibré → S&T quand même interdit
+    const r = evaluateTeam({ abbr: 'S', preSalary: 225_000_000, rosterCount: 15, outgoing: [p(20_000_000)], incoming: [p(20_000_000)], signTradeIn: true }, Y);
+    expect(r.legal).toBe(false);
+    expect(r.errors.some((e) => /sign-and-trade/i.test(e))).toBe(true);
+  });
 });
 
 describe('TPE (traded player exception)', () => {

@@ -97,10 +97,13 @@ export function evaluateTeam(team, year) {
     }
   }
 
-  // 3b) Sign-and-trade reçu : hard cap au 1er apron (et interdiction de le dépasser).
+  // 3b) Sign-and-trade reçu : hard cap au 1er apron. Une équipe DÉJÀ au-dessus du
+  // 1er apron ne peut pas acquérir par S&T (interdiction sèche) ; sinon hard cap.
   if (team.signTradeIn) {
     hardCaps.push('1er apron (S&T)');
-    if (postSalary > Y.firstApron + EPS) {
+    if (overApron) {
+      errors.push("Sign-and-trade : une équipe au-dessus du 1er apron (ou du 2e apron) ne peut pas acquérir de joueur par sign-and-trade.");
+    } else if (postSalary > Y.firstApron + EPS) {
       errors.push(`Sign-and-trade : l'acquéreur ne peut pas dépasser le 1er apron (${fmt(Y.firstApron)}), or la masse passerait à ${fmt(postSalary)}.`);
     }
   }

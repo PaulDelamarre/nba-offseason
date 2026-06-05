@@ -11,6 +11,7 @@ import PlayersPage from './pages/PlayersPage.jsx';
 import GMPage from './pages/GMPage.jsx';
 import ComparePage from './pages/ComparePage.jsx';
 import ScatterPage from './pages/ScatterPage.jsx';
+import RulesPage from './pages/RulesPage.jsx';
 
 const NAV = [
   { to: '/', label: 'Accueil', icon: '🏠', end: true },
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/players', label: 'Joueurs', icon: '👤' },
   { to: '/compare', label: 'Compare', icon: '📊' },
   { to: '/scatter', label: 'Nuage', icon: '📈' },
+  { to: '/regles', label: 'Règles', icon: '📜' },
 ];
 
 function Sidebar() {
@@ -86,6 +88,7 @@ export default function App() {
               <Route path="/players" element={<PlayersPage players={players} />} />
               <Route path="/compare" element={<ComparePage players={players} />} />
               <Route path="/scatter" element={<ScatterPage players={players} />} />
+              <Route path="/regles" element={<RulesPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
