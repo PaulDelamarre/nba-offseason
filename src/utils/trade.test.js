@@ -77,6 +77,35 @@ describe('hard cap au 1er apron (matching étendu : reprend > envoie)', () => {
   });
 });
 
+describe('sign-and-trade (hard cap 1er apron pour l’acquéreur)', () => {
+  it('hard cap signalé et bloque au-dessus du 1er apron', () => {
+    const ok = evaluateTeam({ abbr: 'S', preSalary: 200_000_000, rosterCount: 15, outgoing: [p(10_000_000)], incoming: [p(14_000_000)], signTradeIn: true }, Y);
+    expect(ok.hardCaps.some((h) => /S&T/.test(h))).toBe(true);
+    expect(ok.legal).toBe(true); // post 204M < 209M
+    const ko = evaluateTeam({ abbr: 'S', preSalary: 207_000_000, rosterCount: 15, outgoing: [p(10_000_000)], incoming: [p(14_000_000)], signTradeIn: true }, Y);
+    expect(ko.legal).toBe(false); // post 211M > 209M
+  });
+});
+
+describe('TPE (traded player exception)', () => {
+  it('une TPE disponible élargit la reprise possible', () => {
+    // sortant 9.45M -> max 16.95M ; reprise 20M illégale sans TPE
+    expect(evaluateTeam(overCap({ outgoing: [p(9_450_000)], incoming: [p(20_000_000)] }), Y).legal).toBe(false);
+    // avec une TPE de 5M -> max 21.95M -> légal
+    expect(evaluateTeam(overCap({ outgoing: [p(9_450_000)], incoming: [p(20_000_000)], tpe: 5_000_000 }), Y).legal).toBe(true);
+  });
+});
+
+describe('exception minimum (joueur entrant au minimum, sans matching)', () => {
+  it('un joueur au minimum entrant ne compte pas dans le matching', () => {
+    // sortant 9.45M -> max reprise 16.95M (palier médian)
+    const ok = evaluateTeam(overCap({ outgoing: [p(9_450_000)], incoming: [p(16_950_000), p(2_000_000)] }), Y);
+    expect(ok.legal).toBe(true); // 16.95M matché + 2M via exception minimum
+    const ko = evaluateTeam(overCap({ outgoing: [p(9_450_000)], incoming: [p(16_950_000), p(3_000_000)] }), Y);
+    expect(ko.legal).toBe(false); // 3M > seuil minimum -> compte dans le matching
+  });
+});
+
 describe('evaluateTrade — verdict global', () => {
   it('deux équipes, échange équilibré → légal', () => {
     const res = evaluateTrade({
@@ -98,5 +127,19 @@ describe('evaluateTrade — verdict global', () => {
       ],
     });
     expect(res.legal).toBe(false);
+  });
+});
+
+describe('régressions revue lot 2', () => {
+  const pm = (salary, yos) => ({ id: String(salary) + '-' + yos, name: 'P', salary, yos });
+  it('exception min PAR ANCIENNETÉ : vét-min 10 ans absorbé, même salaire 1 an non', () => {
+    expect(evaluateTeam(overCap({ outgoing: [], incoming: [pm(3_877_445, 10)] }), Y).legal).toBe(true);
+    expect(evaluateTeam(overCap({ outgoing: [], incoming: [pm(3_877_445, 1)] }), Y).legal).toBe(false);
+  });
+  it('absorber via TPE seule : légal, pas de hard cap, tpeUsed > 0', () => {
+    const r = evaluateTeam(overCap({ outgoing: [], incoming: [p(8_000_000)], tpe: 10_000_000 }), Y);
+    expect(r.legal).toBe(true);
+    expect(r.hardCaps).not.toContain('1er apron');
+    expect(r.tpeUsed).toBeGreaterThan(0);
   });
 });

@@ -70,8 +70,9 @@ function GMDashboard({ players, gm, myTeam, season }) {
             <TierBadge tier={taxSum.tier} />
           </div>
         </div>
+        <SavesBar gm={gm} />
         <button onClick={() => gm.setTeam(null)} style={btn}>changer d'équipe</button>
-        <button onClick={gm.reset} style={{ ...btn, marginLeft: 'auto' }}>↺ reset été</button>
+        <button onClick={gm.reset} style={btn}>↺ reset été</button>
       </div>
 
       {/* Onglets */}
@@ -91,7 +92,7 @@ function GMDashboard({ players, gm, myTeam, season }) {
         {tab === 'recap' && <RecapTab players={players} gm={gm} myTeam={myTeam} season={season} cap={cap} />}
       </div>
 
-      {fiche && <PlayerModal player={fiche} onClose={() => setFiche(null)} />}
+      {fiche && <PlayerModal player={fiche} players={players} onSelect={setFiche} onClose={() => setFiche(null)} />}
     </div>
   );
 }
@@ -173,9 +174,16 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
           {cap.draftedSalary > 0 && <CapLine label="Recrues draft" value={cap.draftedSalary} color={C.blue} />}
           {cap.deadMoney > 0 && <CapLine label="Dead money" value={cap.deadMoney} color={C.red} />}
           {cap.holds > 0 && <CapLine label="Cap holds" value={cap.holds} color={C.muted} />}
+          {cap.rosterCharge > 0 && <CapLine label="Charge roster incomplet" value={cap.rosterCharge} color={C.muted} />}
           <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 8, paddingTop: 8 }}>
             <CapLine label="Masse (tax)" value={cap.taxSalary} strong />
             <CapLine label="Cap room" value={cap.capRoomAvail} color={cap.capRoomAvail > 0 ? C.green : C.muted} strong />
+            {capSummary(cap.taxSalary, season).taxBill > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                <span style={{ color: C.muted }}>Luxury tax</span>
+                <b style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(capSummary(cap.taxSalary, season).taxBill)} <span style={{ color: C.muted, fontWeight: 400 }}>(récid. {fmtUSD(capSummary(cap.taxSalary, season).repeaterBill)})</span></b>
+              </div>
+            )}
           </div>
         </div>
 
@@ -252,6 +260,7 @@ const pos5Of = (p) => {
 
 function CourtLineup({ roster, lineup, onSet, byId }) {
   const [active, setActive] = useState(null);
+  const rosterIds = useMemo(() => new Set(roster.map((p) => p.id)), [roster]);
   const used = new Set(Object.values(lineup).filter(Boolean));
   const bench = roster.filter((p) => !used.has(p.id));
 
@@ -265,33 +274,31 @@ function CourtLineup({ roster, lineup, onSet, byId }) {
     <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
       <div>
         <SectionTitle color={C.text}>5 majeur</SectionTitle>
-        <svg viewBox="0 0 300 340" style={{ width: '100%', maxWidth: 320, display: 'block' }}>
-          {/* parquet */}
-          <rect x="6" y="6" width="288" height="328" rx="8" fill="#1c1208" stroke={C.border} />
-          {/* raquette */}
-          <rect x="110" y="6" width="80" height="120" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
-          <circle cx="150" cy="126" r="28" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
-          {/* arceau */}
-          <circle cx="150" cy="30" r="9" fill="none" stroke="#e0743b" strokeWidth="2" />
-          <line x1="130" y1="18" x2="170" y2="18" stroke="#5a4a2f" strokeWidth="2" />
-          {/* ligne à 3 points */}
-          <path d="M30,6 L30,150 A120,120 0 0,0 270,150 L270,6" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
+        <div style={{ position: 'relative', width: '100%', maxWidth: 320 }}>
+          <svg viewBox="0 0 300 340" style={{ width: '100%', display: 'block' }}>
+            <rect x="6" y="6" width="288" height="328" rx="8" fill="#1c1208" stroke={C.border} />
+            <rect x="110" y="6" width="80" height="120" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
+            <circle cx="150" cy="126" r="28" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
+            <circle cx="150" cy="30" r="9" fill="none" stroke="#e0743b" strokeWidth="2" />
+            <line x1="130" y1="18" x2="170" y2="18" stroke="#5a4a2f" strokeWidth="2" />
+            <path d="M30,6 L30,150 A120,120 0 0,0 270,150 L270,6" fill="none" stroke="#5a4a2f" strokeWidth="1.5" />
+          </svg>
           {COURT_SPOTS.map((s) => {
             const pid = lineup[s.pos];
-            const p = pid ? byId.get(pid) : null;
+            const p = (pid && rosterIds.has(pid)) ? byId.get(pid) : null;
             const isActive = active === s.pos;
             return (
-              <g key={s.pos} style={{ cursor: 'pointer' }} onClick={() => (p ? onSet(s.pos, null) : setActive(isActive ? null : s.pos))}>
-                <circle cx={s.x} cy={s.y} r="22" fill={p ? C.accent : isActive ? 'rgba(239,125,58,0.25)' : C.surface2} stroke={isActive ? C.accent : C.border} strokeWidth={isActive ? 2 : 1} />
+              <div key={s.pos} onClick={() => (p ? onSet(s.pos, null) : setActive(isActive ? null : s.pos))}
+                style={{ position: 'absolute', left: `${(s.x / 300) * 100}%`, top: `${(s.y / 340) * 100}%`, transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', width: 56 }}>
                 {p
-                  ? <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#10120f">{num(p.rating) || '–'}</text>
-                  : <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill={C.muted}>{s.pos}</text>}
-                {p && <text x={s.x} y={s.y + 36} textAnchor="middle" fontSize="9" fill={C.text}>{p.name.split(' ').slice(-1)[0]}</text>}
-              </g>
+                  ? <PlayerAvatar player={p} size={42} />
+                  : <div style={{ width: 40, height: 40, borderRadius: '50%', border: `2px dashed ${isActive ? C.accent : C.border}`, background: isActive ? 'rgba(239,125,58,0.22)' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isActive ? C.accent : C.muted, fontWeight: 800, fontSize: 12 }}>{s.pos}</div>}
+                {p && <span style={{ fontSize: 9, color: '#fff', marginTop: 3, whiteSpace: 'nowrap', textShadow: '0 1px 3px #000' }}>{p.name.split(' ').slice(-1)[0]}</span>}
+              </div>
             );
           })}
-        </svg>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+        </div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
           {active ? `Choisis un joueur pour le poste ${active} →` : 'Clique un poste vide, puis un joueur ; clique un joueur placé pour le retirer.'}
         </div>
       </div>
@@ -303,7 +310,7 @@ function CourtLineup({ roster, lineup, onSet, byId }) {
           {bench.map((p) => (
             <button key={p.id} onClick={() => assign(p)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 8, cursor: 'pointer', background: C.surface2, color: C.text, border: `1px solid ${C.border}` }}>
-              <ImpactBubble score={num(p.rating)} size={20} />
+              <PlayerAvatar player={p} size={22} />
               <span style={{ fontSize: 12 }}>{p.name}</span>
               <span style={{ fontSize: 10, color: C.muted }}>{pos5Of(p) || p.posGroup}</span>
             </button>
@@ -528,7 +535,7 @@ function SignPanel({ player, cap, season, myTeam, onSign, onClose }) {
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <ImpactBubble score={player._rating} size={34} />
+        <PlayerAvatar player={player} size={34} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800 }}>{player.name}</div>
           <div style={{ fontSize: 11, color: C.muted }}>{player.pos} · {player.age} ans · {yearsOfService(player)} ans NBA · {player._type}{isOwn ? ' · maison (Bird)' : ''}</div>
@@ -723,6 +730,7 @@ function ProspectModal({ prospect, pickSlot, onDraft, onClose }) {
               <Info label="PTS" value={st.pts.toFixed(1)} color={C.accent} />
               <Info label="REB" value={st.reb.toFixed(1)} color={C.accent} />
               <Info label="AST" value={st.ast.toFixed(1)} color={C.accent} />
+              {st.ts != null && <Info label="TS%" value={`${st.ts}`} color={C.accent} />}
             </div>
           </>
         )}
@@ -862,6 +870,37 @@ function RecapMoveList({ title, color, count, items }) {
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color }}>{title} ({count})</div>
       {items.map((it, i) => <div key={i} style={{ fontSize: 12, color: C.muted, padding: '1px 0 1px 8px' }}>{it}</div>)}
+    </div>
+  );
+}
+
+function SavesBar({ gm }) {
+  const [, bump] = useState(0);
+  const saves = gm.listScenarios();
+  function save() {
+    const name = window.prompt('Nom de la sauvegarde :');
+    if (name && name.trim()) { gm.saveScenario(name.trim()); bump((n) => n + 1); }
+  }
+  function del(name) {
+    if (window.confirm(`Supprimer « ${name} » ?`)) { gm.deleteScenario(name); bump((n) => n + 1); }
+  }
+  function share() {
+    const url = gm.shareLink();
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => window.alert('Lien de partage copié !')).catch(() => window.prompt('Copie ce lien :', url));
+    else window.prompt('Copie ce lien :', url);
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+      <button onClick={save} style={btn}>💾 sauver</button>
+      {saves.length > 0 && (
+        <select onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v === '__none') return; if (v.startsWith('del:')) del(v.slice(4)); else if (v) gm.loadScenario(v); }} value="__none" style={selStyle}>
+          <option value="__none">charger…</option>
+          {saves.map((n) => <option key={n} value={n}>📂 {n}</option>)}
+          <option disabled>──────</option>
+          {saves.map((n) => <option key={`d${n}`} value={`del:${n}`}>🗑 {n}</option>)}
+        </select>
+      )}
+      <button onClick={share} style={btn}>🔗 partager</button>
     </div>
   );
 }

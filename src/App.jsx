@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { C } from './constants/palette.js';
+import Tutorial from './components/Tutorial.jsx';
 import { useDataset } from './hooks/useDataset.js';
 import { GMProvider } from './context/GMContext.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -7,12 +9,16 @@ import TradePage from './pages/TradePage.jsx';
 import TeamsPage from './pages/TeamsPage.jsx';
 import PlayersPage from './pages/PlayersPage.jsx';
 import GMPage from './pages/GMPage.jsx';
+import ComparePage from './pages/ComparePage.jsx';
+import ScatterPage from './pages/ScatterPage.jsx';
 
 const NAV = [
   { to: '/', label: 'Accueil', icon: '🏠', end: true },
   { to: '/gm', label: 'Entresaison', icon: '📋' },
   { to: '/teams', label: 'Équipes', icon: '🏀' },
   { to: '/players', label: 'Joueurs', icon: '👤' },
+  { to: '/compare', label: 'Compare', icon: '📊' },
+  { to: '/scatter', label: 'Nuage', icon: '📈' },
 ];
 
 function Sidebar() {
@@ -49,6 +55,8 @@ function Center({ children, sub }) {
 
 export default function App() {
   const { players, teams, meta, loading, error } = useDataset();
+  const [tuto, setTuto] = useState(() => { try { return !localStorage.getItem('nbagm_tuto_v1'); } catch { return false; } });
+  const closeTuto = () => { try { localStorage.setItem('nbagm_tuto_v1', '1'); } catch { /* ignore */ } setTuto(false); };
 
   if (loading) return (
     <Center sub="Chargement du dataset NBA…">
@@ -76,9 +84,12 @@ export default function App() {
               <Route path="/gm" element={<GMPage players={players} />} />
               <Route path="/teams" element={<TeamsPage players={players} teams={teams} />} />
               <Route path="/players" element={<PlayersPage players={players} />} />
+              <Route path="/compare" element={<ComparePage players={players} />} />
+              <Route path="/scatter" element={<ScatterPage players={players} />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
+          {tuto && <Tutorial onClose={closeTuto} />}
         </div>
       </BrowserRouter>
     </GMProvider>

@@ -72,7 +72,7 @@ export default function HomePage({ players, teams, meta }) {
         </Section>
       </div>
 
-      {fiche && <PlayerModal player={fiche} onClose={() => setFiche(null)} />}
+      {fiche && <PlayerModal player={fiche} players={players} onSelect={setFiche} onClose={() => setFiche(null)} />}
     </div>
   );
 }

@@ -38,6 +38,16 @@ export const TEAMS = [
 
 export const TEAM_BY_ABBR = Object.fromEntries(TEAMS.map((t) => [t.abbr, t]));
 
+// Code ESPN (logos) par abréviation BBRef.
+export const ESPN_CODE = {
+  ATL: 'atl', BOS: 'bos', BRK: 'bkn', CHO: 'cha', CHI: 'chi', CLE: 'cle', DAL: 'dal',
+  DEN: 'den', DET: 'det', GSW: 'gs', HOU: 'hou', IND: 'ind', LAC: 'lac', LAL: 'lal',
+  MEM: 'mem', MIA: 'mia', MIL: 'mil', MIN: 'min', NOP: 'no', NYK: 'ny', OKC: 'okc',
+  ORL: 'orl', PHI: 'phi', PHO: 'phx', POR: 'por', SAC: 'sac', SAS: 'sa', TOR: 'tor',
+  UTA: 'utah', WAS: 'wsh',
+};
+export const teamLogoUrl = (abbr) => (ESPN_CODE[abbr] ? `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN_CODE[abbr]}.png` : null);
+
 // Alias d'abréviations qu'on peut croiser dans les stats (ligne combinée
 // multi-équipes incluse) -> code canonique BBRef.
 export const ABBR_ALIAS = {

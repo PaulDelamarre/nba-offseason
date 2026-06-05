@@ -124,7 +124,7 @@ export default function PlayersPage({ players }) {
         </table>
         {rows.length > 400 && <div style={{ padding: 12, color: C.muted, fontSize: 12, textAlign: 'center' }}>… {rows.length - 400} de plus (affine la recherche)</div>}
       </div>
-      {sel && <PlayerModal player={sel} onClose={() => setSel(null)} />}
+      {sel && <PlayerModal player={sel} players={players} onSelect={setSel} onClose={() => setSel(null)} />}
     </div>
   );
 }

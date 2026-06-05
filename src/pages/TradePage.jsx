@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { C } from '../constants/palette.js';
 import { TEAMS, TEAM_BY_ABBR } from '../constants/teams.js';
 import { CAP_YEARS } from '../constants/cba.js';
-import { fmtUSD } from '../utils/format.js';
+import { fmtUSD, num } from '../utils/format.js';
 import { tradeableRoster, teamSalary, rosterCount, playerById } from '../utils/players.js';
+import { yearsOfService } from '../utils/contracts.js';
 import { evaluateTrade } from '../utils/trade.js';
 import { tradeablePicks, anyPickLabel, isSlotPick, slotOf, stepienViolation } from '../utils/picks.js';
 import { useGM } from '../context/GMContext.jsx';
-import { TeamChip, TierBadge, ImpactBubble } from '../components/ui.jsx';
+import { TeamChip, TierBadge, PlayerAvatar } from '../components/ui.jsx';
 
 export default function TradePage({ players, lockTeam }) {
   const gm = useGM();
@@ -21,6 +22,8 @@ export default function TradePage({ players, lockTeam }) {
   });
   const [assets, setAssets] = useState([]);       // { playerId, from, to }
   const [pickAssets, setPickAssets] = useState([]); // { pickId, from, to }
+  const [stTeams, setStTeams] = useState(() => new Set()); // équipes recevant via sign-and-trade
+  const toggleST = (abbr) => setStTeams((prev) => { const n = new Set(prev); n.has(abbr) ? n.delete(abbr) : n.add(abbr); return n; });
 
   const byId = useMemo(() => playerById(players), [players]);
 
@@ -28,10 +31,10 @@ export default function TradePage({ players, lockTeam }) {
     year: season,
     teams: teamAbbrs.map((abbr) => {
       const outgoing = assets.filter((a) => a.from === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0 }));
-      const incoming = assets.filter((a) => a.to === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0 }));
-      return { abbr, preSalary: teamSalary(players, abbr, season, moveMap), rosterCount: rosterCount(players, abbr, season, moveMap), outgoing, incoming };
+      const incoming = assets.filter((a) => a.to === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0, yos: yearsOfService(byId.get(a.playerId)) }));
+      return { abbr, preSalary: teamSalary(players, abbr, season, moveMap), rosterCount: rosterCount(players, abbr, season, moveMap), outgoing, incoming, tpe: abbr === myTeam ? gm.tpeTotal : 0, signTradeIn: stTeams.has(abbr) };
     }),
-  }), [teamAbbrs, assets, season, players, byId, moveMap]);
+  }), [teamAbbrs, assets, season, players, byId, moveMap, myTeam, gm.tpeTotal, stTeams]);
 
   const result = useMemo(() => evaluateTrade(evalInput), [evalInput]);
   const resultByTeam = useMemo(() => Object.fromEntries(result.teams.map((t) => [t.abbr, t])), [result]);
@@ -54,7 +57,13 @@ export default function TradePage({ players, lockTeam }) {
       .map((p) => ({ slot: slotOf(p.pickId), toTeam: p.to }));
     const inIds = assets.filter((a) => a.to === myTeam).map((a) => a.playerId);
     const outIds = assets.filter((a) => a.from === myTeam).map((a) => a.playerId);
-    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, inIds, outIds });
+    const myOut = assets.filter((a) => a.from === myTeam).reduce((s, a) => s + num(byId.get(a.playerId)?.salaries?.[season]), 0);
+    const myIn = assets.filter((a) => a.to === myTeam).reduce((s, a) => s + num(byId.get(a.playerId)?.salaries?.[season]), 0);
+    const tpeUsed = resultByTeam[myTeam]?.tpeUsed || 0;
+    // On ne crée une TPE que si net-sortant ET aucune TPE n'a été consommée
+    // (sinon on absorberait via une ancienne TPE ET on en créerait une nouvelle).
+    const tpeCreated = (myOut > myIn && tpeUsed === 0) ? myOut - myIn + 250_000 : 0;
+    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, inIds, outIds, tpeCreated, tpeUsed });
     setAssets([]); setPickAssets([]);
   }
 
@@ -77,6 +86,7 @@ export default function TradePage({ players, lockTeam }) {
     setTeamAbbrs((prev) => prev.map((a, i) => (i === idx ? abbr : a)));
     setAssets((prev) => prev.filter((a) => a.from !== old && a.to !== old));
     setPickAssets((prev) => prev.filter((p) => p.from !== old && p.to !== old));
+    setStTeams((prev) => { const n = new Set(prev); n.delete(old); return n; });
   }
   function addTeam() {
     const free = TEAMS.map((t) => t.abbr).find((a) => !teamAbbrs.includes(a));
@@ -87,6 +97,7 @@ export default function TradePage({ players, lockTeam }) {
     setTeamAbbrs((prev) => prev.filter((a) => a !== abbr));
     setAssets((prev) => prev.filter((a) => a.from !== abbr && a.to !== abbr));
     setPickAssets((prev) => prev.filter((p) => p.from !== abbr && p.to !== abbr));
+    setStTeams((prev) => { const n = new Set(prev); n.delete(abbr); return n; });
   }
 
   return (
@@ -99,6 +110,7 @@ export default function TradePage({ players, lockTeam }) {
         {teamAbbrs.length < 4 && <button onClick={addTeam} style={btnStyle}>+ équipe</button>}
         {myInvolved && <button onClick={executeTrade} disabled={!canExecute} style={{ ...btnStyle, ...(canExecute ? { color: '#10120f', background: C.green, border: 'none', fontWeight: 800 } : { opacity: 0.45, cursor: 'not-allowed' }) }}>✓ Exécuter pour {myTeam}</button>}
         {!myTeam && <span style={{ fontSize: 11, color: C.muted }}>(choisis ton équipe dans « Mode GM » pour exécuter un trade)</span>}
+        {gm.tpeTotal > 0 && <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>🎟 TPE {myTeam} : {fmtUSD(gm.tpeTotal)}</span>}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: C.muted }}>
           cap {fmtUSD(CAP_YEARS[season].salaryCap)} · tax {fmtUSD(CAP_YEARS[season].luxuryTax)} · apron1 {fmtUSD(CAP_YEARS[season].firstApron)} · apron2 {fmtUSD(CAP_YEARS[season].secondApron)}
         </div>
@@ -109,6 +121,7 @@ export default function TradePage({ players, lockTeam }) {
           <TeamPanel
             key={abbr} abbr={abbr} idx={idx} season={season} players={players} byId={byId}
             teamAbbrs={teamAbbrs} assets={assets} pickAssets={pickAssets} evalTeam={resultByTeam[abbr]} owners={owners} moveMap={moveMap}
+            signTradeIn={stTeams.has(abbr)} onToggleST={() => toggleST(abbr)}
             onChangeTeam={changeTeam} onRemoveTeam={removeTeam}
             onAdd={addAsset} onRemove={removeAsset} onDest={setDest}
             onAddPick={addPick} onRemovePick={removePick} onPickDest={setPickDest}
@@ -121,7 +134,7 @@ export default function TradePage({ players, lockTeam }) {
   );
 }
 
-function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAssets, evalTeam, owners, moveMap, onChangeTeam, onRemoveTeam, onAdd, onRemove, onDest, onAddPick, onRemovePick, onPickDest }) {
+function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAssets, evalTeam, owners, moveMap, signTradeIn, onToggleST, onChangeTeam, onRemoveTeam, onAdd, onRemove, onDest, onAddPick, onRemovePick, onPickDest }) {
   const [q, setQ] = useState('');
   const [showPicks, setShowPicks] = useState(false);
   const roster = useMemo(() => tradeableRoster(players, abbr, season, moveMap), [players, abbr, season, moveMap]);
@@ -146,6 +159,9 @@ function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAs
           {teamAbbrs.length > 2 && <button onClick={() => onRemoveTeam(abbr)} style={{ ...btnStyle, padding: '4px 8px' }}>✕</button>}
         </div>
         {evalTeam && <CapHeader e={evalTeam} />}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: signTradeIn ? C.blue : C.muted, cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!signTradeIn} onChange={onToggleST} /> reçoit via sign-and-trade (hard cap 1er apron)
+        </label>
       </div>
 
       {(outgoing.length > 0 || incoming.length > 0 || outPicks.length > 0 || inPicks.length > 0) && (
@@ -176,7 +192,7 @@ function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAs
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, cursor: 'pointer' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = C.surface2)}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <ImpactBubble score={p._rating} />
+            <PlayerAvatar player={p} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
               <div style={{ fontSize: 11, color: C.muted }}>{p.pos} · {p.age} ans · {p.stats ? `${fmt1(p.stats.pts)}pts ${fmt1(p.stats.trb)}reb ${fmt1(p.stats.ast)}ast` : '—'}</div>

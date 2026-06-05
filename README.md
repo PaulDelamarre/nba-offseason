@@ -68,20 +68,23 @@ Chaque joueur a une **note 0-100 par percentile** (par poste, atténuée par les
 
 ### Pages
 - **Entresaison / Mode GM** (`/gm`) — le cœur du jeu : tu **choisis ta franchise**, tu fais tes mouvements de l'été, puis tu **valides** et obtiens un **récap**. 5 onglets :
-  - *Effectif & Cap* : **terrain de basket** pour placer ton **5 majeur** (clique un poste puis un joueur), gestion des contrats (**waive & stretch**, **extensions**), **trades exécutés** (annulables), résumé cap, et un **tableau de paie** joueur × saison (2026-31, contrats + extensions + signatures + recrues, totaux vs cap/tax) avec **code couleur des options** : player option (PO), team option (TO), ETO, non-garanti (NG) et **année de départ en UFA**.
-  - *Trades* : la **Trade Machine** (2-4 équipes, joueurs + picks réels + Stepien, verdict CBA live) verrouillée sur ton équipe → bouton **« Exécuter »** qui commite le trade (roster + cap + ordre de draft mis à jour).
+  - *Effectif & Cap* : **terrain de basket** (5 majeur, **avec photos**), gestion des contrats (**waive & stretch**, **extensions**), **trades exécutés**, **TPE** générées, **sauvegarde/chargement** de scénarios nommés + **lien de partage**, résumé cap (dont **luxury tax récidiviste** + **charge de roster incomplet**), et **tableau de paie** joueur × saison avec **code couleur des options** (PO/TO/ETO/NG) et **année UFA**.
+  - *Trades* : la **Trade Machine** (2-4 équipes, joueurs + picks + Stepien, verdict CBA live) verrouillée sur ton équipe → **« Exécuter »** commite le trade. Gère maintenant : **exception minimum** (joueur au min sans matching), **TPE** (créées/utilisées), **sign-and-trade** (hard cap 1er apron).
   - *Free Agency* : signe les FA dans les bonnes exceptions (cap room, MLE, BAE, min), re-signe via **Bird rights**, renonce aux cap holds.
   - *Draft 2026* : **simulation pick par pick** sur l'ordre réel (60 choix). Les CPU piochent le meilleur dispo ; tu choisis sur l'horloge ; rookie scale du slot au cap.
   - *Récap* : cap **avant → après**, tous les mouvements (trades, signatures, draft, waives, extensions), **effectif final** (note + masse), et bouton **« Valider l'entresaison »**.
 - **Équipes** (`/teams`) — les 30 franchises, masse salariale, position vs cap/tax/apron.
-- **Joueurs** (`/players`) — table triable avec **photo** de chaque joueur (headshot Basketball-Reference), note + stats 25-26 + salaire 26-27, **code couleur des options** (PO/TO) et colonne **Contrat / année UFA**. **Filtres** : recherche, équipe, poste, statut (sous contrat / agent libre / expirant / player option / team option), note min, âge max. **Clic sur un joueur → fiche** (photo, identité, stats détaillées, contrat pluriannuel coloré). La fiche est aussi accessible depuis l'effectif et la free agency du Mode GM.
+- **Joueurs** (`/players`) — table triable avec **photo** + **logo d'équipe**, note + stats 25-26 + salaire 26-27, **code couleur des options** (PO/TO) et colonne **Contrat / année UFA**. **Filtres** : recherche, équipe, poste, statut, note min, âge max. **Clic → fiche** (photo, **archétype**, stats, contrat coloré, **profils similaires**). Fiche accessible partout (effectif, FA, accueil, nuage).
+- **Compare** (`/compare`) — **comparateur 2 joueurs** : radar hexagonal (percentiles ligue) + table de stats côte à côte.
+- **Nuage** (`/scatter`) — **scatter plot configurable** : 2 stats en X/Y, tous les joueurs en nuage cliquable → fiche.
 
 > La Trade Machine reste accessible en solo via `/trade`, mais le parcours principal passe par l'onglet *Trades* du Mode GM.
 
 ## Limites connues (v1) & prochaines étapes
 - Masse salariale = somme des salaires BBRef 2026-27 (inclut le non-garanti / options ; pas encore de distinction garanti vs cap hold).
 - Free agency v1 : Bird rights simplifié (tout FA maison = Bird, sans distinguer Early-Bird/Non-Bird ni la tenure exacte) ; RFA détecté par heuristique (jeune + peu d'ancienneté) ; cap hold estimé (120/140 % du salaire précédent).
-- Draft : la simulation CPU pioche le **meilleur disponible** du board (pas de logique « par besoin de poste »). Ordre 2026 = mock ESPN réel (loterie + picks échangés). Slots 2026 = vrais ; picks **futurs** (2027-2031) restent en ownership simplifiée (chaque équipe = ses propres tours). Rookie scale = barème officiel 2025-26 projeté +5 %.
+- Draft : la simulation CPU pioche le **meilleur disponible** du board. Ordre 2026 = mock ESPN réel ; picks **futurs** (2027-2031) = mécanisme de transfert prêt (`FUTURE_PICK_TRANSFERS`) mais vide par défaut (sources d'ownership réel gated → baseline « chaque équipe a ses tours »). Prospects enrichis (Tankathon/ESPN) : taille/poids/âge/PTS-REB-AST/TS%/scouting.
+- CBA v2 (partiel) : **exception minimum**, **TPE**, **sign-and-trade** (hard cap 1er apron), **repeater tax**, **charge de roster incomplet** modélisés en v1 simplifié. Note par **archétype** (heuristique par poste, pas un vrai clustering K-means).
 - Extensions v1 : hausses 8 %/an, max 4 ans, plafond = salaire max du joueur (sans distinguer extension désignée / Rose Rule / extend-and-trade).
 - Trades exécutés = overlay sur MON équipe (les joueurs/picks sont réassignés via `moveMap`/`slotOwners` dérivés des trades, persistés) ; les rosters des autres équipes sont mis à jour côté trade machine mais leur gestion (cap, FA) n'est pas simulée. Un trade ne se commite que si TON équipe y participe.
 - Non encore modélisé côté trade : TPE pluriannuels, sign-and-trade, base-year compensation, exception minimum (pas de matching).

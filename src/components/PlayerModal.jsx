@@ -1,12 +1,15 @@
+import { useMemo } from 'react';
 import { C, OPTION_COLORS, OPTION_LABEL } from '../constants/palette.js';
 import { TEAM_BY_ABBR } from '../constants/teams.js';
 import { fmtUSD, fmtStat, fmtPct, fmtPct3, num } from '../utils/format.js';
-import { TeamChip, PlayerPhoto } from './ui.jsx';
+import { findSimilar } from '../utils/compare.js';
+import { TeamChip, PlayerPhoto, PlayerAvatar } from './ui.jsx';
 
 const nextSeason = (s) => (s ? `${Number(s.slice(0, 4)) + 1}-${String((Number(s.slice(0, 4)) + 2) % 100).padStart(2, '0')}` : null);
 
 // Fiche joueur : photo, identité, stats 2025-26, contrat (options + UFA).
-export default function PlayerModal({ player, onClose }) {
+export default function PlayerModal({ player, onClose, players, onSelect }) {
+  const sims = useMemo(() => (player && players ? findSimilar(player, players, 6) : []), [player, players]);
   if (!player) return null;
   const s = player.stats;
   const t = TEAM_BY_ABBR[player.team];
@@ -29,7 +32,7 @@ export default function PlayerModal({ player, onClose }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, color: C.muted, fontSize: 13 }}>
               <TeamChip abbr={player.team} size={22} /> {t?.name || player.team} · {player.pos || '—'} · {player.age} ans
               {player.exp != null && <span>· {player.exp} ans NBA</span>}
-              {player.college && <span>· {player.college}</span>}
+              {player.archetype && <span style={{ color: C.accent, fontWeight: 700 }}>· {player.archetype}</span>}
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -86,6 +89,24 @@ export default function PlayerModal({ player, onClose }) {
             </div>
           ) : <div style={{ color: OPTION_COLORS.UFA, fontWeight: 700, fontSize: 13 }}>Agent libre 2026 (pas de contrat 2026-27).</div>}
         </div>
+
+        {/* Profils similaires */}
+        {sims.length > 0 && (
+          <div style={{ padding: '0 18px 18px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.muted, marginBottom: 8 }}>PROFILS SIMILAIRES</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+              {sims.map(({ player: sp, sim }) => (
+                <button key={sp.id} onClick={() => onSelect?.(sp)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, cursor: 'pointer', background: C.bg, color: C.text, border: `1px solid ${C.border}`, textAlign: 'left' }}>
+                  <PlayerAvatar player={sp} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sp.name}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{sp.team} · {sim}% sim.</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

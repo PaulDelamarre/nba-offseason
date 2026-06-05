@@ -65,8 +65,34 @@ export function attachRatings(players) {
   // ~35-45 plutôt qu'un 0 trompeur.
   for (const p of players) {
     p.rating = ratePlayer(p, sorted);
+    p.archetype = assignArchetype(p);
   }
   return players;
+}
+
+// Archétype tactique (heuristique par groupe de poste sur le profil de stats).
+export function assignArchetype(p) {
+  const s = p.stats;
+  if (!s) return null;
+  const g = groupOf(p);
+  const pts = num(s.pts), ast = num(s.ast), trb = num(s.trb), blk = num(s.blk),
+    stl = num(s.stl), fg3a = num(s.fg3a), usg = num(s.usgPct);
+  if (g === 'G') {
+    if (ast >= 6) return 'Meneur créateur';
+    if (fg3a >= 5 && stl >= 1.2 && usg < 0.22) return '3&D';
+    if (pts >= 18) return 'Arrière scoreur';
+    return 'Combo guard';
+  }
+  if (g === 'F') {
+    if (pts >= 20 || usg >= 0.26) return 'Ailier scoreur';
+    if (fg3a >= 4 && trb >= 6) return 'Ailier-fort stretch';
+    if (fg3a >= 3.5 && stl >= 0.9) return '3&D ailier';
+    if (trb >= 7) return 'Ailier rebondeur';
+    return 'Ailier polyvalent';
+  }
+  if (blk >= 1.3) return 'Pivot protecteur';
+  if (fg3a >= 2) return 'Pivot stretch';
+  return 'Pivot intérieur';
 }
 
 function ratePlayer(p, sorted) {

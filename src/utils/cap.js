@@ -41,23 +41,26 @@ export function capSummary(salary, year) {
     toFirstApron: Y.firstApron - salary,               // distance (négatif = au-dessus)
     toSecondApron: Y.secondApron - salary,
     taxBill: luxuryTaxBill(salary, year),
+    repeaterBill: luxuryTaxBill(salary, year, true),
   };
 }
 
-// Facture de luxury tax (barème progressif non-récidiviste).
-export function luxuryTaxBill(salary, year) {
+// Facture de luxury tax (barème progressif). `repeater` = récidiviste (+1.00
+// sur chaque palier — équipe taxée 3 des 4 dernières saisons).
+export function luxuryTaxBill(salary, year, repeater = false) {
   const Y = capYear(year);
   let over = salary - Y.luxuryTax;
   if (over <= 0) return 0;
+  const bump = repeater ? 1.0 : 0;
   let bill = 0;
   for (const b of TAX_BRACKETS) {
     if (over <= 0) break;
     const amt = Math.min(over, TAX_BRACKET_STEP);
-    bill += amt * b.rate;
+    bill += amt * (b.rate + bump);
     over -= amt;
   }
-  // au-delà de 20 M$ : 3.75, puis +0.50 par tranche de 5 M$
-  let rate = TAX_BASE_RATE_ABOVE_20M;
+  // au-delà de 20 M$ : 3.75 (+bump), puis +0.50 par tranche de 5 M$
+  let rate = TAX_BASE_RATE_ABOVE_20M + bump;
   while (over > 0) {
     const amt = Math.min(over, TAX_BRACKET_STEP);
     bill += amt * rate;

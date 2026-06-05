@@ -65,12 +65,12 @@ describe('teamCapState — cap room avec holds et renoncements', () => {
     const st = teamCapState(players, 'XX', Y, { signings: [], renounced: new Set() });
     expect(st.baseCommitted).toBe(50_000_000);
     expect(st.holds).toBeGreaterThan(0);
-    expect(st.capRoomAvail).toBeCloseTo(165_000_000 - 50_000_000 - st.holds, 0);
+    expect(st.capRoomAvail).toBeCloseTo(165_000_000 - 50_000_000 - st.holds - st.rosterCharge, 0);
   });
   it('renoncer au FA libère sa cap room', () => {
     const st = teamCapState(players, 'XX', Y, { signings: [], renounced: new Set(['b']) });
     expect(st.holds).toBe(0);
-    expect(st.capRoomAvail).toBe(165_000_000 - 50_000_000);
+    expect(st.capRoomAvail).toBe(165_000_000 - 50_000_000 - st.rosterCharge);
   });
 });
 
@@ -156,5 +156,21 @@ describe('trades dans le mode GM — roster effectif', () => {
     // j'envoie a (->YY) et je reçois b (->XX)
     const after = teamCapState(players, 'XX', Y, { moveMap: { a: 'YY', b: 'XX' } });
     expect(after.baseCommitted).toBe(30_000_000); // a part, b arrive
+  });
+});
+
+import { luxuryTaxBill } from './cap.js';
+describe('CBA v2 — repeater tax & charge de roster', () => {
+  it('repeater tax > tax standard quand au-dessus de la tax', () => {
+    const std = luxuryTaxBill(220_000_000, Y, false);
+    const rep = luxuryTaxBill(220_000_000, Y, true);
+    expect(rep).toBeGreaterThan(std);
+    expect(luxuryTaxBill(150_000_000, Y, true)).toBe(0); // sous la tax -> 0
+  });
+  it('charge de roster incomplet réduit la cap room', () => {
+    const players = [{ id: 'a', team: 'XX', salaries: { '2026-27': 50_000_000 } }]; // 1 slot rempli
+    const st = teamCapState(players, 'XX', Y, {});
+    expect(st.rosterCharge).toBeGreaterThan(0); // 11 slots vides * min recrue
+    expect(st.capRoomBasis).toBe(50_000_000 + st.rosterCharge);
   });
 });

@@ -43,6 +43,24 @@ export function baselinePicks(teamAbbr) {
 }
 export const ALL_TEAM_PICKS = Object.fromEntries(TEAMS.map((t) => [t.abbr, baselinePicks(t.abbr)]));
 
+// Transferts réels de picks FUTURS (2027-2031). { origTeam, year, round, owner }
+// = le 1er/2e tour d'origTeam pour cette année est détenu par `owner`.
+// (Vide par défaut : les sources d'ownership réel sont gated. Mécanisme prêt à
+// peupler — le baseline « chaque équipe a ses propres tours » s'applique sinon.)
+export const FUTURE_PICK_TRANSFERS = [];
+const TRANSFER_MAP = new Map(FUTURE_PICK_TRANSFERS.map((t) => [`${t.origTeam}-${t.year}-R${t.round}`, t.owner]));
+export function pickOwner(origTeam, year, round) {
+  return TRANSFER_MAP.get(`${origTeam}-${year}-R${round}`) || origTeam;
+}
+// Picks futurs détenus par une équipe (transferts appliqués).
+export function futurePicksOwnedBy(team) {
+  const out = [];
+  for (const t of TEAMS) for (const year of PICK_YEARS) for (const round of [1, 2]) {
+    if (pickOwner(t.abbr, year, round) === team) out.push({ id: pickId(t.abbr, year, round), origTeam: t.abbr, year, round });
+  }
+  return out;
+}
+
 // Libellé générique d'un pick (slot 2026 ou futur).
 export function anyPickLabel(id) {
   if (isSlotPick(id)) return slotPickLabel(slotOf(id));
@@ -50,9 +68,10 @@ export function anyPickLabel(id) {
   return `${p.year} ${p.round === 1 ? 'R1' : 'R2'} (${p.origTeam})`;
 }
 
-// Picks échangeables d'une équipe = slots 2026 possédés + picks futurs baseline.
+// Picks échangeables d'une équipe = slots 2026 possédés + picks futurs détenus
+// (transferts réels appliqués).
 export function tradeablePicks(team, owners) {
-  return [...ownedSlots2026(team, owners), ...(ALL_TEAM_PICKS[team] || [])];
+  return [...ownedSlots2026(team, owners), ...futurePicksOwnedBy(team)];
 }
 
 // --- Règle Stepien (uniquement sur les 1ers tours FUTURS, 2027+) --------------

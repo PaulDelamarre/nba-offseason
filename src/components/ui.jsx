@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C, CAP_STATUS_COLORS } from '../constants/palette.js';
-import { TEAM_BY_ABBR } from '../constants/teams.js';
+import { TEAM_BY_ABBR, teamLogoUrl } from '../constants/teams.js';
 import { fmtUSD, num } from '../utils/format.js';
 import { photoUrl } from '../utils/players.js';
 
@@ -31,10 +31,15 @@ export function PlayerAvatar({ player, size = 36 }) {
   );
 }
 
-// Pastille colorée d'une équipe (couleur primaire de la franchise).
+// Logo de l'équipe (ESPN) avec repli sur une pastille colorée si indispo.
 export function TeamChip({ abbr, size = 30 }) {
+  const [err, setErr] = useState(false);
   const t = TEAM_BY_ABBR[abbr];
   const col = t ? t.colors[0] : C.border;
+  const url = teamLogoUrl(abbr);
+  if (url && !err) {
+    return <img src={url} onError={() => setErr(true)} alt={abbr} loading="lazy" style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0, verticalAlign: 'middle' }} />;
+  }
   return (
     <span style={{
       width: size, height: size, borderRadius: 7, flexShrink: 0,

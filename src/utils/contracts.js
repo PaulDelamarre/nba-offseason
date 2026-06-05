@@ -183,14 +183,23 @@ export function teamCapState(players, myTeam, year, gm) {
   // Cap holds des FA maison non encore signés/renoncés.
   const ownFAs = roster.filter((p) => isFreeAgent(p));
   let holds = 0;
+  let holdCount = 0;
   for (const fa of ownFAs) {
     if (signedIds.has(fa.id) || renounced.has(fa.id)) continue;
     holds += capHold(fa, year);
+    holdCount += 1;
   }
 
+  // Charge de roster incomplet : sous 12 « slots » remplis (joueurs sous
+  // contrat + signatures + recrues + cap holds), chaque slot vide = minimum recrue.
+  const ROSTER_CHARGE_SLOTS = 12;
+  const filledSlots = roster.filter((p) => num(p.salaries?.['2026-27']) > 0 && !waivedMap.has(p.id)).length
+    + signings.length + drafted.length + holdCount;
+  const rosterCharge = filledSlots < ROSTER_CHARGE_SLOTS ? (ROSTER_CHARGE_SLOTS - filledSlots) * minSalary(0, year) : 0;
+
   const taxSalary = baseCommitted + signedSalary + draftedSalary + deadMoney; // pour tax/apron
-  const capRoomBasis = taxSalary + holds;                         // pour la cap room
+  const capRoomBasis = taxSalary + holds + rosterCharge;          // pour la cap room
   const capRoomAvail = Math.max(0, Y.salaryCap - capRoomBasis);
 
-  return { baseCommitted, signedSalary, draftedSalary, deadMoney, holds, taxSalary, capRoomBasis, capRoomAvail, ownFAs };
+  return { baseCommitted, signedSalary, draftedSalary, deadMoney, holds, rosterCharge, taxSalary, capRoomBasis, capRoomAvail, ownFAs };
 }
