@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { C, OPTION_COLORS, OPTION_LABEL } from '../constants/palette.js';
 import { TEAMS, TEAM_BY_ABBR } from '../constants/teams.js';
-import { CAP_YEARS } from '../constants/cba.js';
+import { CAP_YEARS, ROSTER } from '../constants/cba.js';
 import { fmtUSD, fmtUSDfull, num } from '../utils/format.js';
 import {
   isFreeAgent, faType, capHold, availableMethods, teamCapState, signingHardCap,
@@ -140,6 +140,12 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
     for (const r of draftRookies) list.push(r);
     return list.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [contract, signings, byId, gm.state.waived, draftRookies]);
+  // Décompte de l'effectif par poste (PG/SG/SF/PF/C), + non classés.
+  const posCounts = useMemo(() => {
+    const c = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0, '?': 0 };
+    for (const p of lineupRoster) { const pos = pos5Of(p) || '?'; (c[pos] != null ? c[pos]++ : c['?']++); }
+    return c;
+  }, [lineupRoster]);
   // Liste « Sous contrat » unifiée = joueurs du dataset + signatures FA + rookies
   // draftés, triés par salaire. Chaque ligne porte un _kind pour adapter les actions.
   const rosterRows = useMemo(() => {
@@ -160,6 +166,23 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Décompte par poste */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 14px' }}>
+        <span style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.6, fontFamily: "'Oswald', sans-serif" }}>Effectif par poste</span>
+        {['PG', 'SG', 'SF', 'PF', 'C'].map((pos) => (
+          <span key={pos} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, opacity: posCounts[pos] ? 1 : 0.4 }}>
+            <b style={{ background: posCounts[pos] ? C.accent : C.border, color: posCounts[pos] ? C.ink : C.muted, borderRadius: 6, padding: '1px 8px', fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 18, textAlign: 'center' }}>{posCounts[pos]}</b>
+            {pos}
+          </span>
+        ))}
+        {posCounts['?'] > 0 && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, color: C.muted }}>
+            <b style={{ background: C.border, color: C.muted, borderRadius: 6, padding: '1px 8px', fontWeight: 800 }}>{posCounts['?']}</b> n.c.
+          </span>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: C.muted, fontWeight: 600 }}>{lineupRoster.length} joueurs</span>
+      </div>
+
       <CourtLineup roster={lineupRoster} lineup={gm.state.lineup} onSet={gm.setLineupSlot} />
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, alignContent: 'start' }}>
       {/* Joueurs sous contrat */}
@@ -224,6 +247,10 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
       {/* Récap cap + signatures + paie pluriannuelle */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {extendSel && <ExtendPanel key={extendSel.id} player={extendSel} season={season} onExtend={(payload) => { gm.extend(payload); setExtendSel(null); }} onClose={() => setExtendSel(null)} />}
+
+        <ActiveRulesPanel cap={cap} season={season} rosterSize={lineupRoster.length} signings={signings} />
+
+        <CapHoldsManager players={players} gm={gm} myTeam={myTeam} season={season} myDraft={myDraft} openFiche={openFiche} />
 
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
           <SectionTitle color={C.text}>Feuille de paie 2026-27</SectionTitle>
@@ -321,6 +348,146 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
       </div>
 
       <PayrollTable payroll={payroll} season={season} />
+    </div>
+  );
+}
+
+/* ----- Restrictions actives (selon la situation cap courante) -------------- */
+// Calcule les règles qui s'appliquent MAINTENANT et bloquent/limitent trades & FA.
+// Réactif : recalculé à chaque mouvement (cap + signings changent).
+function computeActiveRules(cap, season, rosterSize, signings) {
+  const sum = capSummary(cap.taxSalary, season);
+  const tier = sum.tier; // under | over | tax | apron1 | apron2
+  const out = [];
+  const add = (sev, text) => out.push({ sev, text });
+
+  if (tier === 'apron2') {
+    add('red', "2e apron — interdit d'agréger 2 salaires ou + dans un trade (1 sortant max par reprise).");
+    add('red', "2e apron — interdit d'envoyer du cash dans un trade.");
+    add('red', "2e apron — interdit de reprendre plus de salaire que l'envoyé (matching 100 % strict).");
+    add('red', "2e apron — signatures : minimum uniquement (aucune MLE).");
+    add('red', "2e apron — interdit d'acquérir un joueur par sign-and-trade.");
+  } else if (tier === 'apron1') {
+    add('orange', "1er apron — matching de trade à 100 % (plus de coussin de reprise).");
+    add('orange', "1er apron — signatures : Taxpayer MLE + minimum seulement (pas de MLE complète ni BAE).");
+    add('orange', "1er apron — interdit d'acquérir un joueur par sign-and-trade.");
+  } else if (tier === 'tax') {
+    add('yellow', `Luxury tax due : ${fmtUSDfull(sum.taxBill)} (récidiviste ${fmtUSDfull(sum.repeaterBill)}).`);
+    add('muted', "Au-dessus du cap : signatures via exceptions (MLE complète, BAE, min). Trade par paliers de matching.");
+  } else if (tier === 'over') {
+    add('muted', "Au-dessus du cap : plus de cap room → signatures via exceptions (MLE complète, BAE, min).");
+    add('muted', "Trade : reprise limitée par les paliers de matching.");
+  } else { // sous le cap
+    if (cap.capRoomAvail > minSalary(0, season)) {
+      add('green', `Sous le cap : ${fmtUSDfull(cap.capRoomAvail)} de cap room → tu peux absorber des salaires et signer dans la room (+ Room MLE).`);
+    } else if (cap.holds > 0) {
+      add('orange', `Cap holds (${fmtUSDfull(cap.holds)}) : ils consomment toute ta cap room (room ${fmtUSDfull(cap.capRoomAvail)}) → tu es limité aux petites exceptions / au minimum.`);
+      add('muted', "Utilise « Cap holds » ci-dessous pour y renoncer et libérer de la cap room.");
+    } else {
+      add('muted', `Sous le cap mais cap room nulle (${fmtUSDfull(cap.capRoomAvail)}) — signatures via exceptions / minimum.`);
+    }
+  }
+
+  // Hard cap déclenché par une exception déjà utilisée cette intersaison.
+  if (signings?.some((s) => s.method === 'mle' || s.method === 'bae')) {
+    add('orange', `Hard cap au 1er apron ACTIF (MLE/BAE utilisée) : masse plafonnée à ${fmtUSDfull(sum.firstApron)}.`);
+  }
+  if (signings?.some((s) => s.method === 'taxMLE')) {
+    add('orange', `Hard cap au 2e apron ACTIF (Taxpayer MLE utilisée) : masse plafonnée à ${fmtUSDfull(sum.secondApron)}.`);
+  }
+
+  // Taille de roster.
+  if (rosterSize >= ROSTER.max) add('red', `Roster plein (${rosterSize}/${ROSTER.max}) : libère un joueur avant d'en ajouter un.`);
+  else if (rosterSize < ROSTER.min) add('orange', `Roster incomplet (${rosterSize}/${ROSTER.min} min) : tu dois encore signer ${ROSTER.min - rosterSize} joueur(s).`);
+
+  return { tier, tierLabel: sum.tierLabel, rules: out };
+}
+
+const SEV_COLOR = { red: C.red, orange: C.accent, yellow: C.yellow, green: C.green, muted: C.muted };
+const TIER_DOT = { under: C.green, over: C.muted, tax: C.yellow, apron1: C.accent, apron2: C.red };
+
+function ActiveRulesPanel({ cap, season, rosterSize, signings }) {
+  const { tier, tierLabel, rules } = computeActiveRules(cap, season, rosterSize, signings);
+  const blocking = rules.filter((r) => r.sev === 'red' || r.sev === 'orange').length;
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <SectionTitle color={C.text}>Règles actives</SectionTitle>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: TIER_DOT[tier] }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: TIER_DOT[tier] }} /> {tierLabel}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
+        {blocking > 0 ? `${blocking} restriction(s) limitent tes mouvements actuellement.` : 'Aucune restriction d\'apron : marge de manœuvre maximale.'}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rules.map((r, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, lineHeight: 1.4 }}>
+            <span style={{ color: SEV_COLOR[r.sev], fontWeight: 800, flexShrink: 0, marginTop: -1 }}>
+              {r.sev === 'red' ? '⛔' : r.sev === 'orange' ? '⚠' : r.sev === 'yellow' ? '💸' : r.sev === 'green' ? '✅' : '•'}
+            </span>
+            <span style={{ color: r.sev === 'muted' ? C.muted : C.text }}>{r.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ----- Gestion des cap holds (renoncer pour libérer de la cap room) -------- */
+function CapHoldsManager({ players, gm, myTeam, season, myDraft, openFiche }) {
+  const signedIds = new Set(gm.state.signings.map((s) => s.playerId));
+  const ownFAs = players
+    .filter((p) => effectiveTeam(p, gm.moveMap) === myTeam && isFreeAgent(p))
+    .map((p) => ({ ...p, _hold: capHold(p, season), _ren: gm.renouncedSet.has(p.id), _signed: signedIds.has(p.id) }))
+    .sort((a, b) => b._hold - a._hold);
+  if (!ownFAs.length) return null;
+
+  const active = ownFAs.filter((p) => !p._ren && !p._signed); // holds qui pèsent encore
+  const totalActive = active.reduce((a, p) => a + p._hold, 0);
+  const renouncedCount = ownFAs.filter((p) => p._ren).length;
+
+  // Cap room disponible si on renonçait à TOUS les holds restants.
+  const allRenounce = new Set([...gm.state.renounced, ...ownFAs.filter((p) => !p._signed).map((p) => p.id)]);
+  const potential = teamCapState(players, myTeam, season, { signings: gm.state.signings, renounced: allRenounce, waived: gm.state.waived, drafted: myDraft, moveMap: gm.moveMap });
+
+  const renounceAll = () => active.forEach((p) => gm.renounce(p.id));
+  const restoreAll = () => ownFAs.filter((p) => p._ren).forEach((p) => gm.unrenounce(p.id));
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <SectionTitle color={C.text}>Cap holds ({active.length})</SectionTitle>
+        <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: totalActive > 0 ? C.muted : C.green, fontVariantNumeric: 'tabular-nums' }}>{fmtUSD(totalActive)}</span>
+      </div>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 10, lineHeight: 1.45 }}>
+        Renonce à un agent libre maison pour <b style={{ color: C.text }}>retirer son hold</b> et libérer de la cap room.
+        {active.length > 0 && <> Si tu renonces à tout : <b style={{ color: C.green }}>{fmtUSD(potential.capRoomAvail)}</b> de cap room.</>}
+      </div>
+
+      {(active.length > 0 || renouncedCount > 0) && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {active.length > 0 && <button onClick={renounceAll} style={{ ...miniBtn, color: C.accent, borderColor: C.accent }}>↧ Tout renoncer</button>}
+          {renouncedCount > 0 && <button onClick={restoreAll} style={miniBtn}>↩ Tout rétablir ({renouncedCount})</button>}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 240, overflow: 'auto' }}>
+        {ownFAs.map((p) => (
+          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px', borderBottom: `1px solid ${C.border}`, opacity: p._ren || p._signed ? 0.55 : 1 }}>
+            <span onClick={() => openFiche(p)} style={{ cursor: 'pointer' }}><PlayerAvatar player={p} size={26} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, textDecoration: p._ren ? 'line-through' : 'none' }}>{p.name}</div>
+              <div style={{ fontSize: 10, color: C.muted }}>{p.pos} · hold {fmtUSD(p._hold)}{p._signed ? ' · re-signé' : ''}</div>
+            </div>
+            {p._signed
+              ? <span style={{ fontSize: 10, color: C.green, fontWeight: 700 }}>signé</span>
+              : p._ren
+                ? <button onClick={() => gm.unrenounce(p.id)} style={miniBtn}>rétablir</button>
+                : <button onClick={() => gm.renounce(p.id)} style={{ ...miniBtn, color: C.accent, borderColor: C.accent }}>renoncer</button>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -596,6 +763,7 @@ function ExtendPanel({ player, season, onExtend, onClose }) {
 function FreeAgencyTab({ players, gm, myTeam, season, cap, openFiche }) {
   const [scope, setScope] = useState('all');
   const [q, setQ] = useState('');
+  const [posFilter, setPosFilter] = useState('ALL');
   const [sel, setSel] = useState(null);
 
   const faPool = useMemo(() => players.filter(isFreeAgent).map((p) => ({
@@ -603,17 +771,32 @@ function FreeAgencyTab({ players, gm, myTeam, season, cap, openFiche }) {
   })), [players, season, myTeam]);
 
   const signedIds = new Set(gm.state.signings.map((s) => s.playerId));
-  const list = faPool
-    .filter((p) => (scope === 'mine' ? p._own : true) && !signedIds.has(p.id) && p.name.toLowerCase().includes(q.toLowerCase()))
+  // Pool filtré par scope + recherche (avant le filtre de poste, pour les comptes).
+  const scoped = faPool.filter((p) => (scope === 'mine' ? p._own : true) && !signedIds.has(p.id) && p.name.toLowerCase().includes(q.toLowerCase()));
+  const posCount = (pos) => scoped.filter((p) => pos5Of(p) === pos).length;
+  const list = scoped
+    .filter((p) => posFilter === 'ALL' || pos5Of(p) === posFilter)
     .sort((a, b) => b._rating - a._rating);
 
   return (
     <div style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
       <div style={{ flex: 2, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}` }}>
-        <div style={{ display: 'flex', gap: 8, padding: 10, borderBottom: `1px solid ${C.border}` }}>
-          <button onClick={() => setScope('all')} style={pill(scope === 'all')}>Tous les FA ({faPool.length})</button>
-          <button onClick={() => setScope('mine')} style={pill(scope === 'mine')}>Mes FA ({faPool.filter((p) => p._own).length})</button>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…" style={{ ...input, flex: 1 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setScope('all')} style={pill(scope === 'all')}>Tous les FA ({faPool.length})</button>
+            <button onClick={() => setScope('mine')} style={pill(scope === 'mine')}>Mes FA ({faPool.filter((p) => p._own).length})</button>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…" style={{ ...input, flex: 1 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: C.muted, textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5, marginRight: 2 }}>Poste</span>
+            <button onClick={() => setPosFilter('ALL')} style={pill(posFilter === 'ALL')}>Tous ({scoped.length})</button>
+            {['PG', 'SG', 'SF', 'PF', 'C'].map((pos) => (
+              <button key={pos} onClick={() => setPosFilter(pos)} disabled={posCount(pos) === 0}
+                style={{ ...pill(posFilter === pos), opacity: posCount(pos) === 0 ? 0.4 : 1, cursor: posCount(pos) === 0 ? 'default' : 'pointer' }}>
+                {pos} ({posCount(pos)})
+              </button>
+            ))}
+          </div>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {list.map((p) => (
