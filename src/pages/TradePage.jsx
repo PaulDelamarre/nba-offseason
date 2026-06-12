@@ -6,7 +6,8 @@ import { fmtUSD, num } from '../utils/format.js';
 import { tradeableRoster, teamSalary, rosterCount, playerById } from '../utils/players.js';
 import { yearsOfService } from '../utils/contracts.js';
 import { evaluateTrade } from '../utils/trade.js';
-import { tradeablePicks, anyPickLabel, isSlotPick, slotOf, stepienViolation } from '../utils/picks.js';
+import { tradeablePicks, anyPickLabel, isSlotPick, slotOf, slotPickLabel, stepienViolation } from '../utils/picks.js';
+import { PROSPECT_BY_RANK } from '../utils/draft.js';
 import { useGM } from '../context/GMContext.jsx';
 import { TeamChip, TierBadge, PlayerAvatar } from '../components/ui.jsx';
 
@@ -32,18 +33,21 @@ export default function TradePage({ players, lockTeam }) {
     teams: teamAbbrs.map((abbr) => {
       const outgoing = assets.filter((a) => a.from === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0 }));
       const incoming = assets.filter((a) => a.to === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0, yos: yearsOfService(byId.get(a.playerId)) }));
-      return { abbr, preSalary: teamSalary(players, abbr, season, moveMap), rosterCount: rosterCount(players, abbr, season, moveMap), outgoing, incoming, tpe: abbr === myTeam ? gm.tpeTotal : 0, signTradeIn: stTeams.has(abbr) };
+      const picksMoved = pickAssets.some((p) => p.from === abbr || p.to === abbr);
+      return { abbr, preSalary: teamSalary(players, abbr, season, moveMap), rosterCount: rosterCount(players, abbr, season, moveMap), outgoing, incoming, picksMoved, tpe: abbr === myTeam ? gm.tpeTotal : 0, signTradeIn: stTeams.has(abbr) };
     }),
-  }), [teamAbbrs, assets, season, players, byId, moveMap, myTeam, gm.tpeTotal, stTeams]);
+  }), [teamAbbrs, assets, pickAssets, season, players, byId, moveMap, myTeam, gm.tpeTotal, stTeams]);
 
   const result = useMemo(() => evaluateTrade(evalInput), [evalInput]);
   const resultByTeam = useMemo(() => Object.fromEntries(result.teams.map((t) => [t.abbr, t])), [result]);
 
+  // Stepien : tient compte des picks futurs DÉJÀ échangés (gm.futureOwners).
   const stepien = useMemo(() => teamAbbrs.map((abbr) => stepienViolation(
     abbr,
     pickAssets.filter((p) => p.from === abbr).map((p) => p.pickId),
     pickAssets.filter((p) => p.to === abbr).map((p) => p.pickId),
-  )).filter(Boolean), [teamAbbrs, pickAssets]);
+    gm.futureOwners,
+  )).filter(Boolean), [teamAbbrs, pickAssets, gm.futureOwners]);
 
   // Exécuter le trade dans le mode GM (seulement si MON équipe y participe).
   const myInvolved = !!myTeam && teamAbbrs.includes(myTeam)
@@ -52,9 +56,15 @@ export default function TradePage({ players, lockTeam }) {
   function executeTrade() {
     if (!canExecute) return;
     const playerMoves = assets.map((a) => ({ playerId: a.playerId, toTeam: a.to }));
+    // Slots 2026 — y compris déjà draftés : transférer le slot = transférer les
+    // droits du joueur sélectionné (il suit le slot, règle des draft rights).
     const pickMoves = pickAssets
-      .filter((p) => isSlotPick(p.pickId) && gm.state.draftPicks[slotOf(p.pickId)] == null)
+      .filter((p) => isSlotPick(p.pickId))
       .map((p) => ({ slot: slotOf(p.pickId), toTeam: p.to }));
+    // Picks futurs 2027+ : persistés pour que l'ownership suive (Stepien, listes).
+    const futurePickMoves = pickAssets
+      .filter((p) => !isSlotPick(p.pickId))
+      .map((p) => ({ pickId: p.pickId, toTeam: p.to }));
     const inIds = assets.filter((a) => a.to === myTeam).map((a) => a.playerId);
     const outIds = assets.filter((a) => a.from === myTeam).map((a) => a.playerId);
     const myOut = assets.filter((a) => a.from === myTeam).reduce((s, a) => s + num(byId.get(a.playerId)?.salaries?.[season]), 0);
@@ -63,7 +73,7 @@ export default function TradePage({ players, lockTeam }) {
     // On ne crée une TPE que si net-sortant ET aucune TPE n'a été consommée
     // (sinon on absorberait via une ancienne TPE ET on en créerait une nouvelle).
     const tpeCreated = (myOut > myIn && tpeUsed === 0) ? myOut - myIn + 250_000 : 0;
-    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, inIds, outIds, tpeCreated, tpeUsed });
+    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, futurePickMoves, inIds, outIds, tpeCreated, tpeUsed });
     setAssets([]); setPickAssets([]);
   }
 
@@ -108,7 +118,13 @@ export default function TradePage({ players, lockTeam }) {
           {Object.entries(CAP_YEARS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         {teamAbbrs.length < 4 && <button onClick={addTeam} style={btnStyle}>+ équipe</button>}
-        {myInvolved && <button onClick={executeTrade} disabled={!canExecute} style={{ ...btnStyle, ...(canExecute ? { color: '#10120f', background: C.green, border: 'none', fontWeight: 800 } : { opacity: 0.45, cursor: 'not-allowed' }) }}>✓ Exécuter pour {myTeam}</button>}
+        {myTeam && teamAbbrs.includes(myTeam) && (
+          <button onClick={executeTrade} disabled={!canExecute}
+            title={!myInvolved ? `Ajoute des joueurs ou des picks de ${myTeam} au trade` : !canExecute ? 'Le trade doit être valide (verdict en bas)' : 'Commiter ce trade dans ton entresaison'}
+            style={{ ...btnStyle, ...(canExecute ? { color: '#10120f', background: C.green, border: 'none', fontWeight: 800 } : { opacity: 0.45, cursor: 'not-allowed' }) }}>
+            ✓ Exécuter pour {myTeam}
+          </button>
+        )}
         {!myTeam && <span style={{ fontSize: 11, color: C.muted }}>(choisis ton équipe dans « Mode GM » pour exécuter un trade)</span>}
         {gm.tpeTotal > 0 && <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>🎟 TPE {myTeam} : {fmtUSD(gm.tpeTotal)}</span>}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: C.muted }}>
@@ -121,6 +137,7 @@ export default function TradePage({ players, lockTeam }) {
           <TeamPanel
             key={abbr} abbr={abbr} idx={idx} season={season} players={players} byId={byId}
             teamAbbrs={teamAbbrs} assets={assets} pickAssets={pickAssets} evalTeam={resultByTeam[abbr]} owners={owners} moveMap={moveMap}
+            futureOwners={gm.futureOwners} draftPicks={gm.state.draftPicks}
             signTradeIn={stTeams.has(abbr)} onToggleST={() => toggleST(abbr)}
             onChangeTeam={changeTeam} onRemoveTeam={removeTeam}
             onAdd={addAsset} onRemove={removeAsset} onDest={setDest}
@@ -134,7 +151,7 @@ export default function TradePage({ players, lockTeam }) {
   );
 }
 
-function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAssets, evalTeam, owners, moveMap, signTradeIn, onToggleST, onChangeTeam, onRemoveTeam, onAdd, onRemove, onDest, onAddPick, onRemovePick, onPickDest }) {
+function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAssets, evalTeam, owners, moveMap, futureOwners, draftPicks, signTradeIn, onToggleST, onChangeTeam, onRemoveTeam, onAdd, onRemove, onDest, onAddPick, onRemovePick, onPickDest }) {
   const [q, setQ] = useState('');
   const [showPicks, setShowPicks] = useState(false);
   const roster = useMemo(() => tradeableRoster(players, abbr, season, moveMap), [players, abbr, season, moveMap]);
@@ -145,7 +162,18 @@ function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAs
   const sentPickIds = new Set(pickAssets.map((p) => p.pickId));
   const outIds = new Set(outgoing.map((a) => a.playerId));
   const filtered = roster.filter((p) => !outIds.has(p.id) && p.name.toLowerCase().includes(q.toLowerCase()));
-  const ownedPicks = tradeablePicks(abbr, owners).filter((pk) => !sentPickIds.has(pk.id));
+  // Picks échangeables : slots 2026 (un slot déjà drafté = droits du joueur) +
+  // picks futurs selon l'ownership courant (trades exécutés inclus).
+  const ownedPicks = tradeablePicks(abbr, owners, futureOwners, draftPicks).filter((pk) => !sentPickIds.has(pk.id));
+  // Libellé d'un pick dans les lignes ENVOIE/REÇOIT (droits du drafté inclus).
+  const pickLabel = (pid) => {
+    if (isSlotPick(pid)) {
+      const rank = draftPicks?.[slotOf(pid)];
+      const pr = rank != null ? PROSPECT_BY_RANK[rank] : null;
+      if (pr) return `${slotPickLabel(slotOf(pid))} · droits ${pr.name}`;
+    }
+    return anyPickLabel(pid);
+  };
   const others = teamAbbrs.filter((a) => a !== abbr);
 
   return (
@@ -166,8 +194,8 @@ function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAs
 
       {(outgoing.length > 0 || incoming.length > 0 || outPicks.length > 0 || inPicks.length > 0) && (
         <div style={{ padding: 10, borderBottom: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8, background: C.bg }}>
-          {(outgoing.length > 0 || outPicks.length > 0) && <AssetGroup title="ENVOIE ↑" color={C.red} items={outgoing} picks={outPicks} byId={byId} season={season} others={others} onRemove={onRemove} onDest={onDest} onRemovePick={onRemovePick} onPickDest={onPickDest} />}
-          {(incoming.length > 0 || inPicks.length > 0) && <AssetGroup title="REÇOIT ↓" color={C.green} items={incoming} picks={inPicks} byId={byId} season={season} />}
+          {(outgoing.length > 0 || outPicks.length > 0) && <AssetGroup title="ENVOIE ↑" color={C.red} items={outgoing} picks={outPicks} byId={byId} season={season} others={others} onRemove={onRemove} onDest={onDest} onRemovePick={onRemovePick} onPickDest={onPickDest} pickLabel={pickLabel} />}
+          {(incoming.length > 0 || inPicks.length > 0) && <AssetGroup title="REÇOIT ↓" color={C.green} items={incoming} picks={inPicks} byId={byId} season={season} pickLabel={pickLabel} />}
         </div>
       )}
 
@@ -178,11 +206,20 @@ function TeamPanel({ abbr, idx, season, players, byId, teamAbbrs, assets, pickAs
 
       {showPicks && (
         <div style={{ padding: '0 10px 8px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-          {ownedPicks.map((pk) => (
-            <button key={pk.id} onClick={() => onAddPick(pk.id, abbr)} style={{ ...pickChip, opacity: pk.round === 1 ? 1 : 0.7 }}>
-              {pk.slot ? `26 #${pk.slot}` : `${pk.year} ${pk.round === 1 ? 'R1' : 'R2'}`}
-            </button>
-          ))}
+          {ownedPicks.map((pk) => {
+            const rights = pk.draftedRank != null ? PROSPECT_BY_RANK[pk.draftedRank] : null;
+            const label = pk.slot
+              ? `26 #${pk.slot}${rights ? ` · ${rights.name.split(' ').slice(-1)[0]}` : ''}`
+              : `${pk.year} ${pk.round === 1 ? 'R1' : 'R2'}${pk.origTeam && pk.origTeam !== abbr ? ` (${pk.origTeam})` : ''}`;
+            return (
+              <button key={pk.id} onClick={() => onAddPick(pk.id, abbr)}
+                title={rights ? `Droits de draft : ${rights.name} (sélectionné au #${pk.slot}) — l'échanger déplace le joueur, 0 $ au matching` : ''}
+                style={{ ...pickChip, opacity: pk.round === 1 ? 1 : 0.7, ...(rights ? { borderColor: C.accent, color: C.accent } : {}) }}>
+                {label}
+              </button>
+            );
+          })}
+          {!ownedPicks.length && <span style={{ fontSize: 11, color: C.muted }}>Aucun pick disponible.</span>}
         </div>
       )}
 
@@ -228,7 +265,7 @@ function CapHeader({ e }) {
   );
 }
 
-function AssetGroup({ title, color, items, picks = [], byId, season, others, onRemove, onDest, onRemovePick, onPickDest }) {
+function AssetGroup({ title, color, items, picks = [], byId, season, others, onRemove, onDest, onRemovePick, onPickDest, pickLabel = anyPickLabel }) {
   return (
     <div>
       <div style={{ fontSize: 10, fontWeight: 800, color, letterSpacing: 0.5, marginBottom: 4 }}>{title}</div>
@@ -251,7 +288,7 @@ function AssetGroup({ title, color, items, picks = [], byId, season, others, onR
       })}
       {picks.map((pa) => (
         <div key={pa.pickId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 12 }}>
-          <span style={{ flex: 1, color: C.accent }}>🎟 {anyPickLabel(pa.pickId)}</span>
+          <span style={{ flex: 1, color: C.accent }}>🎟 {pickLabel(pa.pickId)}</span>
           {others && onPickDest && others.length > 1 && (
             <select value={pa.to} onChange={(e) => onPickDest(pa.pickId, e.target.value)} style={{ ...selStyle, padding: '1px 4px', fontSize: 11 }}>
               {others.map((o) => <option key={o} value={o}>→{o}</option>)}
@@ -276,7 +313,7 @@ function VerdictBar({ result, stepien = [] }) {
     <div style={{ borderTop: `1px solid ${C.border}`, background: C.surface, padding: '12px 20px', maxHeight: '32vh', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color }}>
-          {result.empty ? '— Ajoute des joueurs des deux côtés' : ok ? '✓ Trade valide' : '✗ Trade invalide'}
+          {result.empty ? '— Ajoute des joueurs ou des picks des deux côtés' : ok ? '✓ Trade valide' : '✗ Trade invalide'}
         </div>
         {!result.empty && (
           <div style={{ display: 'flex', gap: 8, fontSize: 12, color: C.muted, flexWrap: 'wrap' }}>

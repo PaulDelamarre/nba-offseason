@@ -137,10 +137,12 @@ export function evaluateTeam(team, year) {
   };
 }
 
-// Évalue le trade complet (2 à 4 équipes).
+// Évalue le trade complet (2 à 4 équipes). Une équipe est « active » si elle
+// échange du salaire OU des picks (`picksMoved`) : les trades 100 % picks sont
+// légaux en NBA (aucun salary matching à vérifier).
 export function evaluateTrade({ teams, year }) {
   const results = (teams || []).map((t) => evaluateTeam(t, year));
-  const active = results.filter((r) => r.outSalary > 0 || r.inSalary > 0);
+  const active = results.filter((r, i) => r.outSalary > 0 || r.inSalary > 0 || (teams || [])[i]?.picksMoved);
   const legal = active.length >= 2 && results.every((r) => r.legal);
   return {
     year,

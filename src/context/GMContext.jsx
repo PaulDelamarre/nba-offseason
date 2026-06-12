@@ -97,12 +97,14 @@ const GMContext = createContext(null);
 // Overlays dérivés des trades exécutés.
 function tradeMoveMap(trades) {
   const moveMap = {}; // playerId -> équipe de destination
-  const slotOwners = {}; // slot de draft -> équipe propriétaire
+  const slotOwners = {}; // slot de draft 2026 -> équipe propriétaire
+  const futureOwners = {}; // pickId futur (ex. 'BOS-2027-R1') -> équipe propriétaire
   for (const t of trades) {
     for (const pm of t.playerMoves || []) moveMap[pm.playerId] = pm.toTeam;
     for (const pk of t.pickMoves || []) slotOwners[pk.slot] = pk.toTeam;
+    for (const fp of t.futurePickMoves || []) futureOwners[fp.pickId] = fp.toTeam;
   }
-  return { moveMap, slotOwners };
+  return { moveMap, slotOwners, futureOwners };
 }
 
 export function GMProvider({ children }) {
@@ -125,11 +127,12 @@ export function GMProvider({ children }) {
   }, [state]);
 
   const value = useMemo(() => {
-    const { moveMap, slotOwners } = tradeMoveMap(state.trades);
+    const { moveMap, slotOwners, futureOwners } = tradeMoveMap(state.trades);
     return {
       state,
       moveMap,            // overlay joueurs (trades exécutés)
-      slotOwners,         // overlay picks (trades exécutés) -> ordre de draft
+      slotOwners,         // overlay picks 2026 (trades exécutés) -> ordre de draft
+      futureOwners,       // overlay picks futurs 2027+ (trades exécutés)
       tpes: state.tpes,
       tpeTotal: state.tpes.reduce((a, t) => a + t.amount, 0),
       renouncedSet: new Set(state.renounced),

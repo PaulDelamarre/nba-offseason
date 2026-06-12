@@ -24,9 +24,18 @@ export const slotOwner = (n, owners) => (owners && owners[n]) || DEFAULT_SLOT_OW
 export const slotPickLabel = (n) => `2026 #${n} (${slotRound(n) === 1 ? 'R1' : 'R2'})`;
 
 // Slots 2026 possédés par une équipe (selon l'override d'ownership courant).
-export function ownedSlots2026(team, owners) {
+// `draftPicks` (map { slot: prospectRank }) : un slot déjà UTILISÉ reste
+// échangeable en tant que DROITS DE DRAFT du joueur sélectionné (règle NBA :
+// un drafté non signé s'échange via ses droits, 0 $ au matching). Le champ
+// `draftedRank` indique alors le prospect concerné — l'échanger déplace le joueur.
+export function ownedSlots2026(team, owners, draftPicks) {
   const out = [];
-  for (let n = 1; n <= 60; n++) if (slotOwner(n, owners) === team) out.push({ id: slotPickId(n), slot: n, round: slotRound(n) });
+  for (let n = 1; n <= 60; n++) {
+    if (slotOwner(n, owners) === team) {
+      const rank = draftPicks ? draftPicks[n] : null;
+      out.push({ id: slotPickId(n), slot: n, round: slotRound(n), draftedRank: rank ?? null });
+    }
+  }
   return out;
 }
 
@@ -52,11 +61,18 @@ const TRANSFER_MAP = new Map(FUTURE_PICK_TRANSFERS.map((t) => [`${t.origTeam}-${
 export function pickOwner(origTeam, year, round) {
   return TRANSFER_MAP.get(`${origTeam}-${year}-R${round}`) || origTeam;
 }
-// Picks futurs détenus par une équipe (transferts appliqués).
-export function futurePicksOwnedBy(team) {
+// Propriétaire effectif d'un pick futur : override des trades exécutés en jeu
+// (`futureOwners` : { pickId -> abbr }), sinon transferts réels, sinon l'équipe d'origine.
+export function effectivePickOwner(origTeam, year, round, futureOwners) {
+  const id = pickId(origTeam, year, round);
+  return (futureOwners && futureOwners[id]) || pickOwner(origTeam, year, round);
+}
+
+// Picks futurs détenus par une équipe (transferts réels + trades exécutés appliqués).
+export function futurePicksOwnedBy(team, futureOwners) {
   const out = [];
   for (const t of TEAMS) for (const year of PICK_YEARS) for (const round of [1, 2]) {
-    if (pickOwner(t.abbr, year, round) === team) out.push({ id: pickId(t.abbr, year, round), origTeam: t.abbr, year, round });
+    if (effectivePickOwner(t.abbr, year, round, futureOwners) === team) out.push({ id: pickId(t.abbr, year, round), origTeam: t.abbr, year, round });
   }
   return out;
 }
@@ -68,21 +84,25 @@ export function anyPickLabel(id) {
   return `${p.year} ${p.round === 1 ? 'R1' : 'R2'} (${p.origTeam})`;
 }
 
-// Picks échangeables d'une équipe = slots 2026 possédés + picks futurs détenus
-// (transferts réels appliqués).
-export function tradeablePicks(team, owners) {
-  return [...ownedSlots2026(team, owners), ...futurePicksOwnedBy(team)];
+// Picks échangeables d'une équipe = slots 2026 possédés NON UTILISÉS + picks
+// futurs détenus (transferts réels + trades exécutés appliqués).
+export function tradeablePicks(team, owners, futureOwners, draftPicks) {
+  return [...ownedSlots2026(team, owners, draftPicks), ...futurePicksOwnedBy(team, futureOwners)];
 }
 
 // --- Règle Stepien (uniquement sur les 1ers tours FUTURS, 2027+) --------------
-export function stepienViolation(teamAbbr, outgoingIds, incomingIds) {
+// Basée sur la PROPRIÉTÉ EFFECTIVE : tient compte des trades de picks déjà
+// exécutés (`futureOwners`), pas seulement du trade en cours.
+export function stepienViolation(teamAbbr, outgoingIds, incomingIds, futureOwners) {
   const out = new Set(outgoingIds.filter((id) => !isSlotPick(id)));
   const inc = incomingIds.filter((id) => !isSlotPick(id)).map(parsePick).filter((p) => p.round === 1);
   const hasFirst = {};
   for (const year of PICK_YEARS) {
-    const keepsOwn = !out.has(pickId(teamAbbr, year, 1));
+    // Possède-t-il encore AU MOINS un 1er tour cette année-là après le trade ?
+    const keepsOne = TEAMS.some((t) =>
+      effectivePickOwner(t.abbr, year, 1, futureOwners) === teamAbbr && !out.has(pickId(t.abbr, year, 1)));
     const getsOne = inc.some((p) => p.year === year);
-    hasFirst[year] = keepsOwn || getsOne;
+    hasFirst[year] = keepsOne || getsOne;
   }
   for (let i = 0; i < PICK_YEARS.length - 1; i++) {
     if (!hasFirst[PICK_YEARS[i]] && !hasFirst[PICK_YEARS[i + 1]]) {

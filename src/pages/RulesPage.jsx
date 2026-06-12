@@ -172,9 +172,20 @@ export default function RulesPage() {
         {/* ============ PICKS ============ */}
         <Section icon="🎯" title="Choix de draft (picks)">
           <Rule title="Règle Stepien — pas deux 1ers tours d'affilée" status="ok"
-            example={<>Si tu échanges tes 1ers tours {b('2027')} et {b('2028')}, le moteur {red('bloque')} : interdiction de se retrouver sans 1er tour deux années consécutives.</>}>
+            example={<>Si tu échanges tes 1ers tours {b('2027')} et {b('2028')} (dans le même trade ou via deux trades successifs), le moteur {red('bloque')} : interdiction de se retrouver sans 1er tour deux années consécutives.</>}>
             Tu ne peux jamais te retrouver <b style={{ color: C.text }}>sans 1er tour deux drafts de suite</b> (sur les picks futurs 2027→2031).
-            Le moteur vérifie chaque paire d'années consécutives et refuse le trade si l'une et l'autre seraient vides.
+            Le moteur vérifie la <b style={{ color: C.text }}>propriété effective</b> (trades déjà exécutés inclus) : acquérir le 1er tour d'une autre équipe pour une année « vide » te remet en règle.
+          </Rule>
+
+          <Rule title="Trades 100 % picks" status="ok"
+            example={<>Échanger {b('2026 #27')} contre {b('2027 R2')} sans aucun joueur est un trade {grn('valide')} — aucun salary matching à vérifier (les picks n'ont pas de salaire).</>}>
+            Comme en NBA, un trade peut ne contenir <b style={{ color: C.text }}>que des picks</b> (ou des picks contre joueurs). Le verdict CBA et l'exécution fonctionnent sans salaire des deux côtés.
+          </Rule>
+
+          <Rule title="Droits de draft (pick utilisé)" status="ok"
+            example={<>Tu as drafté {b('AJ Dybantsa')} au #1 ? Le chip devient {b('« 26 #1 · Dybantsa »')} : l'échanger transfère <b style={{ color: C.text }}>le joueur avec le pick</b>, pour {grn('0 $')} au salary matching.</>}>
+            Comme en NBA, un joueur sélectionné mais pas encore signé s'échange via ses <b style={{ color: C.text }}>droits de draft</b> :
+            le pick utilisé reste échangeable, le drafté suit son slot (dans les deux sens — tu peux aussi <b style={{ color: C.text }}>acquérir</b> les droits d'un drafté d'une autre équipe), et il compte 0 $ dans le matching. Son salaire rookie compte au cap de l'équipe qui le détient.
           </Rule>
 
           <Rule title="Échange / transfert de picks 2026 (slots réels)" status="ok"
@@ -182,9 +193,14 @@ export default function RulesPage() {
             Les 60 slots réels de la draft 2026 ont un propriétaire ; un trade de pick transfère ce slot et <b style={{ color: C.text }}>modifie l'ordre</b> de la simulation de draft.
           </Rule>
 
-          <Rule title="Droits de swap conditionnels & protections de picks" status="partial">
-            Le transfert de propriété d'un pick est géré, mais les <b style={{ color: C.text }}>droits de swap</b> (échanger les positions sans céder le pick) et les
-            <b style={{ color: C.text }}> protections</b> (top-4, etc.) ne sont pas modélisés en tant que tels. Les transferts de picks <i>futurs</i> réels (2027+) ont un mécanisme prêt mais laissé vide faute de données.
+          <Rule title="Picks futurs (2027-2031) : propriété persistée" status="ok"
+            example={<>Tu cèdes ton {b('2027 R1')} à LAL : il disparaît de tes picks échangeables, apparaît chez LAL avec la mention {b('2027 R1 (BOS)')}, et la règle Stepien en tient compte pour tes prochains trades.</>}>
+            Chaque équipe possède ses 1ers/2es tours 2027→2031 ; un trade exécuté <b style={{ color: C.text }}>transfère durablement</b> la propriété (listes et Stepien suivent).
+          </Rule>
+
+          <Rule title="Droits de swap conditionnels & protections de picks" status="no">
+            Les <b style={{ color: C.text }}>droits de swap</b> (échanger les positions sans céder le pick) et les <b style={{ color: C.text }}>protections</b> (top-4…)
+            ne sont pas modélisés. L'ownership réel initial des picks 2027+ (échanges passés de la vraie NBA) n'est pas chargé : chaque équipe part avec ses propres tours.
           </Rule>
         </Section>
 

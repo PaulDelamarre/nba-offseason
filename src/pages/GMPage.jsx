@@ -11,6 +11,7 @@ import {
 } from '../utils/contracts.js';
 import { effectiveTeam } from '../utils/players.js';
 import { nextPick, teamAt, takenRanks, picksOfTeam, LAST_PICK, rookieSalary, prospectPosGroup } from '../utils/draft.js';
+import { anyPickLabel, slotPickLabel } from '../utils/picks.js';
 import { PROSPECTS_2026, PROSPECT_STATS } from '../constants/draft.js';
 import { capSummary } from '../utils/cap.js';
 import { useGM } from '../context/GMContext.jsx';
@@ -283,6 +284,18 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
                 </div>
                 {(t.inIds || []).length > 0 && <div style={{ fontSize: 12, color: C.green }}>↓ {(t.inIds).map((id) => byId.get(id)?.name || id).join(', ')}</div>}
                 {(t.outIds || []).length > 0 && <div style={{ fontSize: 12, color: C.red }}>↑ {(t.outIds).map((id) => byId.get(id)?.name || id).join(', ')}</div>}
+                {(() => {
+                  const pks = [
+                    ...(t.pickMoves || []).map((pm) => ({ label: slotPickLabel(pm.slot), to: pm.toTeam })),
+                    ...(t.futurePickMoves || []).map((fp) => ({ label: anyPickLabel(fp.pickId), to: fp.toTeam })),
+                  ];
+                  const pIn = pks.filter((p) => p.to === myTeam);
+                  const pOut = pks.filter((p) => p.to !== myTeam);
+                  return <>
+                    {pIn.length > 0 && <div style={{ fontSize: 12, color: C.green }}>↓ 🎟 {pIn.map((p) => p.label).join(', ')}</div>}
+                    {pOut.length > 0 && <div style={{ fontSize: 12, color: C.red }}>↑ 🎟 {pOut.map((p) => `${p.label} →${p.to}`).join(', ')}</div>}
+                  </>;
+                })()}
               </div>
             ))}
           </div>

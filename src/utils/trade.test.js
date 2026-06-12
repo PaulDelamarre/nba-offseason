@@ -112,6 +112,31 @@ describe('exception minimum (joueur entrant au minimum, sans matching)', () => {
   });
 });
 
+describe('trade 100 % picks (sans salaire)', () => {
+  it('légal : deux équipes qui n\'échangent que des picks', () => {
+    const res = evaluateTrade({
+      year: Y,
+      teams: [
+        { abbr: 'A', preSalary: 180_000_000, rosterCount: 15, picksMoved: true },
+        { abbr: 'B', preSalary: 170_000_000, rosterCount: 15, picksMoved: true },
+      ],
+    });
+    expect(res.empty).toBe(false);
+    expect(res.legal).toBe(true);
+  });
+  it('vide : une seule équipe active', () => {
+    const res = evaluateTrade({
+      year: Y,
+      teams: [
+        { abbr: 'A', preSalary: 180_000_000, rosterCount: 15, picksMoved: true },
+        { abbr: 'B', preSalary: 170_000_000, rosterCount: 15 },
+      ],
+    });
+    expect(res.empty).toBe(true);
+    expect(res.legal).toBe(false);
+  });
+});
+
 describe('evaluateTrade — verdict global', () => {
   it('deux équipes, échange équilibré → légal', () => {
     const res = evaluateTrade({
