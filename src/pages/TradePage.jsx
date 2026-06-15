@@ -9,7 +9,7 @@ import { evaluateTrade } from '../utils/trade.js';
 import { tradeablePicks, anyPickLabel, isSlotPick, slotOf, slotPickLabel, stepienViolation } from '../utils/picks.js';
 import { PROSPECT_BY_RANK } from '../utils/draft.js';
 import { useGM } from '../context/GMContext.jsx';
-import { TeamChip, TierBadge, PlayerAvatar } from '../components/ui.jsx';
+import { TeamChip, TierBadge, PlayerAvatar, PlayerPhoto } from '../components/ui.jsx';
 
 export default function TradePage({ players, lockTeam }) {
   const gm = useGM();
@@ -274,6 +274,7 @@ function AssetGroup({ title, color, items, picks = [], byId, season, others, onR
         if (!p) return null;
         return (
           <div key={a.playerId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 12 }}>
+            <PlayerPhoto player={p} size={22} />
             <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
             <span style={{ fontVariantNumeric: 'tabular-nums', color: C.muted }}>{fmtUSD(p.salaries?.[season])}</span>
             {others && onDest && others.length > 1 && (
