@@ -198,9 +198,15 @@ export default function RulesPage() {
             Chaque équipe possède ses 1ers/2es tours 2027→2031 ; un trade exécuté <b style={{ color: C.text }}>transfère durablement</b> la propriété (listes et Stepien suivent).
           </Rule>
 
-          <Rule title="Droits de swap conditionnels & protections de picks" status="no">
-            Les <b style={{ color: C.text }}>droits de swap</b> (échanger les positions sans céder le pick) et les <b style={{ color: C.text }}>protections</b> (top-4…)
-            ne sont pas modélisés. L'ownership réel initial des picks 2027+ (échanges passés de la vraie NBA) n'est pas chargé : chaque équipe part avec ses propres tours.
+          <Rule title="Swap de picks 2026 (échange de positions)" status="ok"
+            example={<>Swap {b('#5 ⇄ #20')} favorable à BOS : BOS prend le {grn('#5')}, l'autre équipe hérite du #20. L'ordre de la draft 2026 se met à jour ; aucun pick n'est retiré (pas d'impact Stepien).</>}>
+            Un <b style={{ color: C.text }}>swap</b> échange des <b style={{ color: C.text }}>positions</b> de draft : le détenteur prend le meilleur des deux slots, l'autre le moins bon.
+            Comme l'ordre 2026 est connu, c'est résolu immédiatement (encart « 🔄 Swaps de picks 2026 » de la Trade Machine).
+          </Rule>
+
+          <Rule title="Swaps futurs (2027+) & protections de picks" status="no">
+            Un swap sur une année <b style={{ color: C.text }}>future</b> dépend du classement à venir (meilleur/moins bon), non simulé ici faute de projection des saisons 2027-2031.
+            Les <b style={{ color: C.text }}>protections</b> (top-4…) et l'ownership réel initial des picks 2027+ ne sont pas chargés non plus.
           </Rule>
         </Section>
 

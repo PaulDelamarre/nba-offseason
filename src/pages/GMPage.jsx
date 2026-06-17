@@ -285,8 +285,9 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
                 {(t.inIds || []).length > 0 && <div style={{ fontSize: 12, color: C.green }}>↓ {(t.inIds).map((id) => byId.get(id)?.name || id).join(', ')}</div>}
                 {(t.outIds || []).length > 0 && <div style={{ fontSize: 12, color: C.red }}>↑ {(t.outIds).map((id) => byId.get(id)?.name || id).join(', ')}</div>}
                 {(() => {
+                  const swapSlots = new Set((t.swapMoves || []).flatMap((s) => [s.better, s.worse]));
                   const pks = [
-                    ...(t.pickMoves || []).map((pm) => ({ label: slotPickLabel(pm.slot), to: pm.toTeam })),
+                    ...(t.pickMoves || []).filter((pm) => !swapSlots.has(pm.slot)).map((pm) => ({ label: slotPickLabel(pm.slot), to: pm.toTeam })),
                     ...(t.futurePickMoves || []).map((fp) => ({ label: anyPickLabel(fp.pickId), to: fp.toTeam })),
                   ];
                   const pIn = pks.filter((p) => p.to === myTeam);
@@ -294,6 +295,9 @@ function RosterTab({ players, gm, myTeam, season, cap, openFiche }) {
                   return <>
                     {pIn.length > 0 && <div style={{ fontSize: 12, color: C.green }}>↓ 🎟 {pIn.map((p) => p.label).join(', ')}</div>}
                     {pOut.length > 0 && <div style={{ fontSize: 12, color: C.red }}>↑ 🎟 {pOut.map((p) => `${p.label} →${p.to}`).join(', ')}</div>}
+                    {(t.swapMoves || []).map((s, i) => (
+                      <div key={i} style={{ fontSize: 12, color: C.accent }}>🔄 Swap : #{s.better} ⇄ #{s.worse} → {s.holder} prend #{s.better}{s.swapped ? '' : ' (sans effet)'}</div>
+                    ))}
                   </>;
                 })()}
               </div>

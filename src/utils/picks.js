@@ -39,6 +39,34 @@ export function ownedSlots2026(team, owners, draftPicks) {
   return out;
 }
 
+// --- Swaps de picks 2026 (positions connues → résolution déterministe) --------
+// Un « swap » donne au DÉTENTEUR (`holder`) le droit de prendre le MEILLEUR des
+// deux slots (numéro le plus petit) ; l'autre équipe hérite du moins bon. Comme
+// l'ordre 2026 est connu, le swap se résout immédiatement en réaffectation de
+// slots. Règle NBA : un swap ne retire pas de pick à personne (pas d'impact
+// Stepien), il échange seulement des positions.
+export function resolveSwap2026({ slotA, teamA, slotB, teamB, holder }) {
+  const a = Number(slotA);
+  const b = Number(slotB);
+  const better = Math.min(a, b);
+  const worse = Math.max(a, b);
+  const other = holder === teamA ? teamB : teamA;
+  const holderSlot = holder === teamA ? a : b;
+  return {
+    better, worse, holder, other,
+    // meilleur slot → détenteur, moins bon → l'autre équipe
+    assignments: [{ slot: better, toTeam: holder }, { slot: worse, toTeam: other }],
+    // l'ownership change-t-il réellement ? (sinon le détenteur avait déjà le meilleur)
+    swapped: a !== b && holderSlot === worse,
+  };
+}
+
+export function swapLabel(s) {
+  const lo = Math.min(Number(s.slotA), Number(s.slotB));
+  const hi = Math.max(Number(s.slotA), Number(s.slotB));
+  return `Swap 2026 : #${lo} ⇄ #${hi} · favorable ${s.holder}`;
+}
+
 // --- Picks futurs (baseline) --------------------------------------------------
 export function pickId(origTeam, year, round) { return `${origTeam}-${year}-R${round}`; }
 export function parsePick(id) {

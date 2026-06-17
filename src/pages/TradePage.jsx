@@ -6,7 +6,7 @@ import { fmtUSD, num } from '../utils/format.js';
 import { tradeableRoster, teamSalary, rosterCount, playerById } from '../utils/players.js';
 import { yearsOfService } from '../utils/contracts.js';
 import { evaluateTrade } from '../utils/trade.js';
-import { tradeablePicks, anyPickLabel, isSlotPick, slotOf, slotPickLabel, stepienViolation } from '../utils/picks.js';
+import { tradeablePicks, ownedSlots2026, anyPickLabel, isSlotPick, slotOf, slotPickLabel, stepienViolation, resolveSwap2026, swapLabel } from '../utils/picks.js';
 import { PROSPECT_BY_RANK } from '../utils/draft.js';
 import { useGM } from '../context/GMContext.jsx';
 import { TeamChip, TierBadge, PlayerAvatar, PlayerPhoto } from '../components/ui.jsx';
@@ -23,8 +23,11 @@ export default function TradePage({ players, lockTeam }) {
   });
   const [assets, setAssets] = useState([]);       // { playerId, from, to }
   const [pickAssets, setPickAssets] = useState([]); // { pickId, from, to }
+  const [swaps, setSwaps] = useState([]);         // { id, teamA, slotA, teamB, slotB, holder }
   const [stTeams, setStTeams] = useState(() => new Set()); // équipes recevant via sign-and-trade
   const toggleST = (abbr) => setStTeams((prev) => { const n = new Set(prev); n.has(abbr) ? n.delete(abbr) : n.add(abbr); return n; });
+  const addSwap = (s) => setSwaps((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
+  const removeSwap = (id) => setSwaps((prev) => prev.filter((s) => s.id !== id));
 
   const byId = useMemo(() => playerById(players), [players]);
 
@@ -33,10 +36,10 @@ export default function TradePage({ players, lockTeam }) {
     teams: teamAbbrs.map((abbr) => {
       const outgoing = assets.filter((a) => a.from === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0 }));
       const incoming = assets.filter((a) => a.to === abbr).map((a) => ({ id: a.playerId, salary: byId.get(a.playerId)?.salaries?.[season] || 0, yos: yearsOfService(byId.get(a.playerId)) }));
-      const picksMoved = pickAssets.some((p) => p.from === abbr || p.to === abbr);
+      const picksMoved = pickAssets.some((p) => p.from === abbr || p.to === abbr) || swaps.some((s) => s.teamA === abbr || s.teamB === abbr);
       return { abbr, preSalary: teamSalary(players, abbr, season, moveMap), rosterCount: rosterCount(players, abbr, season, moveMap), outgoing, incoming, picksMoved, tpe: abbr === myTeam ? gm.tpeTotal : 0, signTradeIn: stTeams.has(abbr) };
     }),
-  }), [teamAbbrs, assets, pickAssets, season, players, byId, moveMap, myTeam, gm.tpeTotal, stTeams]);
+  }), [teamAbbrs, assets, pickAssets, swaps, season, players, byId, moveMap, myTeam, gm.tpeTotal, stTeams]);
 
   const result = useMemo(() => evaluateTrade(evalInput), [evalInput]);
   const resultByTeam = useMemo(() => Object.fromEntries(result.teams.map((t) => [t.abbr, t])), [result]);
@@ -51,7 +54,7 @@ export default function TradePage({ players, lockTeam }) {
 
   // Exécuter le trade dans le mode GM (seulement si MON équipe y participe).
   const myInvolved = !!myTeam && teamAbbrs.includes(myTeam)
-    && (assets.some((a) => a.from === myTeam || a.to === myTeam) || pickAssets.some((p) => p.from === myTeam || p.to === myTeam));
+    && (assets.some((a) => a.from === myTeam || a.to === myTeam) || pickAssets.some((p) => p.from === myTeam || p.to === myTeam) || swaps.some((s) => s.teamA === myTeam || s.teamB === myTeam));
   const canExecute = myInvolved && result.legal && stepien.length === 0;
   function executeTrade() {
     if (!canExecute) return;
@@ -61,6 +64,10 @@ export default function TradePage({ players, lockTeam }) {
     const pickMoves = pickAssets
       .filter((p) => isSlotPick(p.pickId))
       .map((p) => ({ slot: slotOf(p.pickId), toTeam: p.to }));
+    // Swaps 2026 : résolus en réaffectation de slots (meilleur → détenteur).
+    const swapResolved = swaps.map((s) => ({ s, r: resolveSwap2026(s) }));
+    for (const { r } of swapResolved) pickMoves.push(...r.assignments);
+    const swapMoves = swapResolved.map(({ s, r }) => ({ ...s, better: r.better, worse: r.worse, holder: r.holder, other: r.other, swapped: r.swapped }));
     // Picks futurs 2027+ : persistés pour que l'ownership suive (Stepien, listes).
     const futurePickMoves = pickAssets
       .filter((p) => !isSlotPick(p.pickId))
@@ -73,8 +80,8 @@ export default function TradePage({ players, lockTeam }) {
     // On ne crée une TPE que si net-sortant ET aucune TPE n'a été consommée
     // (sinon on absorberait via une ancienne TPE ET on en créerait une nouvelle).
     const tpeCreated = (myOut > myIn && tpeUsed === 0) ? myOut - myIn + 250_000 : 0;
-    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, futurePickMoves, inIds, outIds, tpeCreated, tpeUsed });
-    setAssets([]); setPickAssets([]);
+    gm.executeTrade({ partners: teamAbbrs.slice(), playerMoves, pickMoves, futurePickMoves, swapMoves, inIds, outIds, tpeCreated, tpeUsed });
+    setAssets([]); setPickAssets([]); setSwaps([]);
   }
 
   function addAsset(playerId, from) {
@@ -96,6 +103,7 @@ export default function TradePage({ players, lockTeam }) {
     setTeamAbbrs((prev) => prev.map((a, i) => (i === idx ? abbr : a)));
     setAssets((prev) => prev.filter((a) => a.from !== old && a.to !== old));
     setPickAssets((prev) => prev.filter((p) => p.from !== old && p.to !== old));
+    setSwaps((prev) => prev.filter((s) => s.teamA !== old && s.teamB !== old));
     setStTeams((prev) => { const n = new Set(prev); n.delete(old); return n; });
   }
   function addTeam() {
@@ -107,6 +115,7 @@ export default function TradePage({ players, lockTeam }) {
     setTeamAbbrs((prev) => prev.filter((a) => a !== abbr));
     setAssets((prev) => prev.filter((a) => a.from !== abbr && a.to !== abbr));
     setPickAssets((prev) => prev.filter((p) => p.from !== abbr && p.to !== abbr));
+    setSwaps((prev) => prev.filter((s) => s.teamA !== abbr && s.teamB !== abbr));
     setStTeams((prev) => { const n = new Set(prev); n.delete(abbr); return n; });
   }
 
@@ -132,6 +141,8 @@ export default function TradePage({ players, lockTeam }) {
         </div>
       </div>
 
+      <SwapBuilder teamAbbrs={teamAbbrs} owners={owners} draftPicks={gm.state.draftPicks} swaps={swaps} onAddSwap={addSwap} onRemoveSwap={removeSwap} />
+
       <div style={{ flex: 1, display: 'flex', gap: 12, padding: 12, overflow: 'auto' }}>
         {teamAbbrs.map((abbr, idx) => (
           <TeamPanel
@@ -147,6 +158,80 @@ export default function TradePage({ players, lockTeam }) {
       </div>
 
       <VerdictBar result={result} stepien={stepien} />
+    </div>
+  );
+}
+
+// Encart « Swaps de picks 2026 » : échange de POSITIONS de draft (le détenteur
+// prend le meilleur slot). Résolution déterministe car l'ordre 2026 est connu.
+function SwapBuilder({ teamAbbrs, owners, draftPicks, swaps, onAddSwap, onRemoveSwap }) {
+  const [open, setOpen] = useState(false);
+  const [teamA, setTeamA] = useState(teamAbbrs[0]);
+  const [teamB, setTeamB] = useState(teamAbbrs[1]);
+  const [slotA, setSlotA] = useState('');
+  const [slotB, setSlotB] = useState('');
+  const [holder, setHolder] = useState(teamAbbrs[0]);
+
+  // garde les sélections cohérentes si les équipes du trade changent
+  const tA = teamAbbrs.includes(teamA) ? teamA : teamAbbrs[0];
+  const tB = teamAbbrs.includes(teamB) && teamB !== tA ? teamB : (teamAbbrs.find((a) => a !== tA) || teamAbbrs[1]);
+  const hold = (hold0) => (teamAbbrs.includes(hold0) && (hold0 === tA || hold0 === tB)) ? hold0 : tA;
+  const holderV = hold(holder);
+
+  const slotsA = ownedSlots2026(tA, owners, draftPicks).map((s) => s.slot);
+  const slotsB = ownedSlots2026(tB, owners, draftPicks).map((s) => s.slot);
+
+  const add = () => {
+    if (!slotA || !slotB || tA === tB) return;
+    onAddSwap({ id: `${tA}-${slotA}-${tB}-${slotB}`, teamA: tA, slotA: Number(slotA), teamB: tB, slotB: Number(slotB), holder: holderV });
+    setSlotA(''); setSlotB('');
+  };
+
+  return (
+    <div style={{ padding: '6px 12px 0' }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ ...btnStyle, fontSize: 12, color: swaps.length ? C.accent : C.text }}>
+        🔄 Swaps de picks 2026 {swaps.length > 0 ? `(${swaps.length})` : ''} {open ? '▾' : '▸'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, padding: 10, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Le <b style={{ color: C.text }}>détenteur</b> prend le meilleur des deux slots (numéro le plus petit) ; l'autre équipe hérite du moins bon. N'impacte pas la règle Stepien.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12 }}>
+            <select value={tA} onChange={(e) => setTeamA(e.target.value)} style={selStyle}>
+              {teamAbbrs.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={slotA} onChange={(e) => setSlotA(e.target.value)} style={selStyle}>
+              <option value="">slot…</option>
+              {slotsA.map((n) => <option key={n} value={n}>#{n}</option>)}
+            </select>
+            <span style={{ color: C.muted, fontWeight: 800 }}>⇄</span>
+            <select value={tB} onChange={(e) => setTeamB(e.target.value)} style={selStyle}>
+              {teamAbbrs.filter((a) => a !== tA).map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select value={slotB} onChange={(e) => setSlotB(e.target.value)} style={selStyle}>
+              <option value="">slot…</option>
+              {slotsB.map((n) => <option key={n} value={n}>#{n}</option>)}
+            </select>
+            <span style={{ color: C.muted }}>favorable à</span>
+            <select value={holderV} onChange={(e) => setHolder(e.target.value)} style={selStyle}>
+              <option value={tA}>{tA}</option>
+              <option value={tB}>{tB}</option>
+            </select>
+            <button onClick={add} disabled={!slotA || !slotB} style={{ ...btnStyle, color: (!slotA || !slotB) ? C.muted : C.accent, borderColor: (!slotA || !slotB) ? C.border : C.accent, cursor: (!slotA || !slotB) ? 'not-allowed' : 'pointer' }}>+ ajouter</button>
+          </div>
+          {swaps.map((s) => {
+            const r = resolveSwap2026(s);
+            return (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, padding: '3px 0', borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.accent, fontWeight: 700 }}>🔄 {swapLabel(s)}</span>
+                <span style={{ color: C.muted }}>→ {r.holder} prend #{r.better}, {r.other} prend #{r.worse}{r.swapped ? '' : ' (sans effet : le détenteur avait déjà le meilleur)'}</span>
+                <button onClick={() => onRemoveSwap(s.id)} style={{ ...btnStyle, padding: '0 6px', marginLeft: 'auto', color: C.muted }}>✕</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

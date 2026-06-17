@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ownedSlots2026, stepienViolation, slotPickId, futurePicksOwnedBy, tradeablePicks } from './picks.js';
+import { ownedSlots2026, stepienViolation, slotPickId, futurePicksOwnedBy, tradeablePicks, resolveSwap2026 } from './picks.js';
 import { teamAt, simulate, nextPick } from './draft.js';
 
 describe('réconciliation picks ↔ draft', () => {
@@ -59,5 +59,31 @@ describe('picks — règles NBA (slots utilisés, picks futurs persistés)', () 
     // mais s'il a acquis le 2027 R1 de LAL entre-temps, pas de violation
     const fo2 = { 'BOS-2027-R1': 'LAL', 'LAL-2027-R1': 'BOS' };
     expect(stepienViolation('BOS', ['BOS-2028-R1'], [], fo2)).toBeNull();
+  });
+});
+
+describe('swap de picks 2026 (résolution déterministe)', () => {
+  it('le détenteur prend le meilleur slot, l\'autre le moins bon', () => {
+    // BOS #20, LAL #5, favorable à BOS → BOS prend #5, LAL prend #20
+    const r = resolveSwap2026({ teamA: 'BOS', slotA: 20, teamB: 'LAL', slotB: 5, holder: 'BOS' });
+    expect(r.better).toBe(5);
+    expect(r.worse).toBe(20);
+    expect(r.holder).toBe('BOS');
+    expect(r.other).toBe('LAL');
+    expect(r.swapped).toBe(true); // BOS avait le #20 (moins bon) → l'ownership change
+    expect(r.assignments).toEqual([{ slot: 5, toTeam: 'BOS' }, { slot: 20, toTeam: 'LAL' }]);
+  });
+  it('sans effet si le détenteur possédait déjà le meilleur', () => {
+    // BOS #5, LAL #20, favorable à BOS → BOS garde #5 (aucun changement réel)
+    const r = resolveSwap2026({ teamA: 'BOS', slotA: 5, teamB: 'LAL', slotB: 20, holder: 'BOS' });
+    expect(r.swapped).toBe(false);
+    expect(r.assignments).toEqual([{ slot: 5, toTeam: 'BOS' }, { slot: 20, toTeam: 'LAL' }]);
+  });
+  it('le détenteur peut être l\'équipe B', () => {
+    const r = resolveSwap2026({ teamA: 'BOS', slotA: 5, teamB: 'LAL', slotB: 20, holder: 'LAL' });
+    expect(r.holder).toBe('LAL');
+    expect(r.other).toBe('BOS');
+    expect(r.swapped).toBe(true); // LAL avait le #20 → swap vers #5
+    expect(r.assignments).toEqual([{ slot: 5, toTeam: 'LAL' }, { slot: 20, toTeam: 'BOS' }]);
   });
 });
